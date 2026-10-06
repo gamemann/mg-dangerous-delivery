@@ -17,8 +17,8 @@ const DdBank := preload("res://game/dd_bank.gd")
 const DdTrip := preload("res://game/dd_trip.gd")
 const DdProgress := preload("res://game/dd_progress.gd")
 
-const SECTIONS := 14
-const CHECKS := 79
+const SECTIONS := 15
+const CHECKS := 84
 
 var _passed := 0
 var _failed := 0
@@ -58,6 +58,7 @@ func _ready() -> void:
 	_test_refusals()
 	_test_pay()
 	_test_ice_and_debris()
+	await _test_a_trailer()
 
 	print("")
 	print("%d sections entered, %d finished" % [_entered, _finished])
@@ -159,7 +160,7 @@ func _test_weather() -> void:
 func _test_trucks() -> void:
 	_section("trucks and upgrades")
 	var trucks := DdTrucks.new()
-	_check(trucks.order.size() == 4 and trucks.starter() == &"box_truck", "four trucks, and the free one is the starter")
+	_check(trucks.order.size() == 5 and trucks.starter() == &"box_truck", "five trucks, and the free one is the starter")
 	var plain := trucks.tunables_for(&"hauler")
 	var tuned := trucks.tunables_for(&"hauler", {"engine": 2, "tyres": 1})
 	_check(tuned.engine_force > plain.engine_force * 1.2 and tuned.friction_slip > plain.friction_slip, "upgrades raise the engine and the grip")
@@ -436,6 +437,35 @@ func _test_ice_and_debris() -> void:
 	var _b := fresh.build(road.doc)
 	_check(fresh.ice == road.ice and fresh.debris == road.debris, "and every machine lays them in the same places")
 	fresh.queue_free()
+	_finished_section()
+
+
+func _test_a_trailer() -> void:
+	_section("an eighteen-wheeler")
+	var _j := game.join(&"semi", "Semi Driver")
+	var _c := game.bank.credit(&"semi", 100000, "test")
+	_check(game.buy_truck(&"semi", &"semi").ok, "the Semi can be bought")
+	var _s := game.start_trip(&"semi", &"dd_foothills")
+	var me: DdGame.Driver = game.drivers[&"semi"]
+	var trailer = me.trailer
+	_check(trailer != null and trailer.joint != null, "it comes with a trailer, hitched")
+	me.assisted = true
+	me.idle = 999.0
+	me.autopilot = DotVehicleDriver.new()
+	me.autopilot.target_speed = 10.0
+	me.autopilot.set_route(game._global_points(&"dd_foothills", 4.0))
+	await _seconds(8.0)
+	var truck := me.truck as Node3D
+	var gap := truck.global_position.distance_to(trailer.global_position)
+	_check((me.trip as DdTrip).distance > 30.0 and gap < 9.0, "the trailer follows it up the road (%.0f m along, %.1f m behind)" % [(me.trip as DdTrip).distance, gap])
+	var _r := game.respawn(&"semi")
+	await _seconds(0.8)
+	_check(absf(trailer.angle_to(truck)) < 10.0 and truck.global_position.distance_to(trailer.global_position) < 9.0,
+		"and is put back straight behind it after a respawn (%.1f degrees)" % trailer.angle_to(truck))
+	game.end_trip(&"semi")
+	await get_tree().process_frame
+	_check(me.trailer == null and not is_instance_valid(trailer), "and goes with the truck")
+	game.leave(&"semi")
 	_finished_section()
 
 

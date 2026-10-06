@@ -20,6 +20,7 @@ game/
   dd_weather.gd    the sky over a zone as a pure function of (seed, zone, tick); gusts; grip
   dd_trucks.gd     the catalogue and the upgrades, as data; tunables_for() is what a truck drives with
   dd_truck.gd      a VehicleBody3D built from a Kenney model: hull from its bounds, wheels from its wheel nodes
+  dd_trailer.gd    the Semi's trailer: a VehicleBody3D on free wheels, a Generic6DOF hitch, re-hitched on every teleport
   dd_trip.gd       one haul: stage, cargo, falls, skips, the chaos it met, and the pay formula
   dd_bank.gd       accounts, and two stores: JsonStore and SqlStore (dot-moderation's driver shape)
   dd_game.gd       the world: every route side by side, drivers, trips, falls, rock, solo, stand-ins, garage_view()
@@ -36,7 +37,7 @@ game/
 routes/            five routes, written by tools/build_routes.py
 assets/kenney/trucks/  four Car Kit trucks and their atlas, CC0
 scenes/            dd_server.tscn
-examples/          headless_run (14 sections, 79 checks), headless_net (9, 30), dedicated (6, 19)
+examples/          headless_run (15 sections, 84 checks), headless_net (10, 32), dedicated (6, 19)
 tools/             build_routes.py; drive.sh/.gd (a stand-in delivers every route); shot.sh/.gd (render)
 ```
 
@@ -62,6 +63,10 @@ A rock site comes down when a driving truck is `boulder_trigger_distance` short 
 
 `DdGame._refresh_exceptions` makes every pair of trucks collide unless either is solo, either is a ghost, or `trucks_collide` is off — both ways, recomputed whenever a truck appears, goes, or changes. `DdGame.sees(viewer, other)`: a solo viewer sees nobody; a solo truck is hidden from others unless `solo_hidden_from_others` is off (a truck others can see and drive through is a ghost, which is worse than one that is not there). Chat is not touched by it.
 
+## Decision 4b: the Semi pulls a trailer, on a joint
+
+The brief says eighteen-wheelers. The Semi (`DdTrucks`, `"trailer": {length, mass}` on any truck makes one) pulls a `DdTrailer`: a VehicleBody3D on four free-rolling wheels — a box dragged along the road is friction that stops a truck dead on a climb — hitched by a `Generic6DOFJoint3D` that swings ±80°, nods ±18° and rolls hardly at all (a trailer that could roll on its own would leave the road while the truck stayed on it). It takes the road's grip, it is in every collision exception its truck is (solo, ghost), it is replicated as its own body, and **every teleport re-hitches it** (`DdTrailer.rehitch`): a joint whose two bodies jumped apart yanks them back together, which the screenshot tool found by doing exactly that — the truck dragged back to its trailer at the lot, 43% of the load gone. `trailers` (on) turns them all off. A stand-in delivers every route in the Semi (`TRUCK=semi tools/drive.sh`).
+
 ## Decision 5: the wire carries trucks in snapshots and everything else as JSON
 
 Nothing is predicted (dot-vehicle's decision for rigid bodies), so the bridge is a fraction of the other games'. A client sends what it is pressing as four bytes a tick behind a snapshot ack (`DdEvents.write_drive`), unreliably; the server drives with the latest. Trucks and boulders are `DotNetIdentity`s with `Authority.SERVER`, always relevant, replicated by `DdBodyNet` (pose, interpolated) and `DdTruckNet` (plus steering and signed km/h); a client creates the body on a DRIVER or BODY event and keeps it frozen. HELLO carries the seed, the route documents and the settings a client's own weather needs; after that a client builds every road and computes every zone's sky itself, and `headless_net` checks the nine zones agree. The rest — DRIVER, GONE, TRIP (to the owner, six a second), GARAGE, SAY, WEATHER, BODY — is JSON, because it is a few hundred bytes a second and a garage view that grows a field should be a change in one place. Every garage button and key is one ACT request answered by `DdBridgeActs.run`, which an offline client calls directly: one table, so offline and online cannot mean different things by "skip".
@@ -83,8 +88,8 @@ Money is keyed by the session's account uid (`uid:…`), which dot-server has at
 godot --headless --path . --import
 find . -name '*.gd' -not -path './.godot/*' -not -path './addons/*' | while read f; do
     godot --headless --path . --check-only --script "res://${f#./}"; done
-godot --headless --path . res://examples/headless_run.tscn   # 14 sections, 79 checks, ~25 s
-godot --headless --path . res://examples/headless_net.tscn   # 9 sections, 30 checks: server and client over loopback
+godot --headless --path . res://examples/headless_run.tscn   # 15 sections, 84 checks, ~35 s
+godot --headless --path . res://examples/headless_net.tscn   # 10 sections, 32 checks: server and client over loopback
 godot --headless --path . res://examples/dedicated.tscn      # 6 sections, 19 checks: a real DotServer and the module by path
 tools/build_routes.py --check
 tools/drive.sh                     # every route delivered by a stand-in; TRUCK=bulk too (2026-10-06)
@@ -100,6 +105,5 @@ In the order they are worth doing.
 1. **A browser look.** `examples/delivery_client` in dot-server-deploy proves the pack, the socket and the driving; nobody has driven it in the web shell. Then publish: the pack is `tmc/delivery` (`content/delivery/`), and the release order is the family's (addons tagged, shell, then the game).
 2. **The platform layer and dot-stats**: names and avatars come from the session today (`_make_identity` returns null); dot-platform's identity, and dot-stats: deliveries, distance, falls, money earned, per player, reported like mg-deathrun's `DrProgress`.
 3. **Scenery.** The mountain is the road and its cliff; there is no terrain beyond, and the other routes show as pale walls in the distance. Kenney's Nature Kit has rocks and trees.
-4. **A trailer.** The brief says 18-wheelers; Kenney has none, and an articulated trailer on a `Generic6DOFJoint3D` is a real physics job (jack-knifing is the point of it).
 5. **Sounds**: engine, brakes, a boulder, the depot.
 6. **The GitHub repository** (gamemann/mg-dangerous-delivery) is the owner's to create; the remote is set and nothing is pushed.

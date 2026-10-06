@@ -23,6 +23,12 @@ func _ready() -> void:
 	add_child(client)
 	client.game.config.levels_unlock_in_order = false
 
+	var truck := str(_args.get("truck", ""))
+
+	if truck != "":
+		var _c = client.game.bank.credit(client.local_key, 100000, "shot")
+		var _b = client.game.buy_truck(client.local_key, StringName(truck))
+
 	if view != "garage":
 		# Unlocking was refused at _ready for anything above level 1: ask again now it is off.
 		client.game.end_trip(client.local_key)
@@ -44,6 +50,12 @@ func _ready() -> void:
 		var where: Transform3D = road.transform_at(at_m, 0.8)
 		where.origin += road.position
 		me.truck.place(where)
+
+		# Re-hitched, as the game does on every teleport: a joint whose two bodies jumped
+		# apart yanks them back together (the first render: the truck dragged back to its
+		# trailer at the lot, 43% of the load gone).
+		if me.trailer != null:
+			me.trailer.rehitch(me.truck)
 		me.trip.distance = at_m
 		me.trip.hint = road.index_at_distance(at_m)
 		me.autopilot.set_route(client.game._global_points(me.trip.route_id, at_m))

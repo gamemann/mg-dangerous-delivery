@@ -21,6 +21,7 @@ const DdConfig := preload("dd_config.gd")
 const DdRoute := preload("dd_route.gd")
 const DdRouteDoc := preload("dd_route_doc.gd")
 const DdTruck := preload("dd_truck.gd")
+const DdTrailer := preload("dd_trailer.gd")
 const DdTrucks := preload("dd_trucks.gd")
 const DdTrip := preload("dd_trip.gd")
 const DdBank := preload("dd_bank.gd")
@@ -68,6 +69,7 @@ class Driver:
 	var is_bot: bool = false
 	var solo: bool = false
 	var truck: Node = null
+	var trailer: Node = null
 	var trip: RefCounted = null
 	var command: DotVehicleCommand = DotVehicleCommand.new()
 	var autopilot: DotVehicleDriver = null
@@ -380,6 +382,14 @@ func start_trip(key: StringName, route_id: StringName) -> DotResult:
 	truck.name = "Truck_%s" % String(key)
 	add_child(truck)
 	driver.truck = truck
+	var trailer_spec: Variant = trucks.get_truck(truck_id).get("trailer")
+
+	if config.trailers and trailer_spec is Dictionary:
+		var trailer := DdTrailer.new()
+		trailer.configure(trailer_spec, truck.half_length, 2.5, draws)
+		trailer.name = "Trailer_%s" % String(key)
+		add_child(trailer)
+		driver.trailer = trailer
 
 	var trip := DdTrip.new()
 	var doc: Dictionary = documents[route_id]
@@ -632,6 +642,9 @@ func _step_driver(driver: Driver, delta: float) -> void:
 
 	truck.set_grip(grip)
 
+	if driver.trailer != null:
+		(driver.trailer as DdTrailer).set_grip(grip)
+
 	if bool(sky.get("wind", false)) and config.wind_strength > 0.0:
 		var side := DdRoute.right_of(road.yaws[trip.hint])
 		truck.push(side, config.wind_strength * DdWeather.gust(seed_value, "%s|%s" % [trip.route_id, zone], tick, tick_rate))
@@ -711,6 +724,9 @@ func _put_at(driver: Driver, stage: int) -> void:
 	var at := road.transform_at(d, 0.6)
 	at.origin += road.position
 	(driver.truck as DdTruck).place(at)
+
+	if driver.trailer != null and is_instance_valid(driver.trailer):
+		(driver.trailer as DdTrailer).rehitch(driver.truck as DdTruck)
 	trip.distance = d
 	trip.furthest = maxf(trip.furthest, d)
 	trip.hint = road.index_at_distance(d)
@@ -723,6 +739,18 @@ func _put_at(driver: Driver, stage: int) -> void:
 
 
 func _remove_truck(driver: Driver) -> void:
+	if driver.trailer != null and is_instance_valid(driver.trailer):
+		var trailer := driver.trailer as DdTrailer
+
+		if trailer.joint != null and is_instance_valid(trailer.joint):
+			trailer.joint.get_parent().remove_child(trailer.joint)
+			trailer.joint.queue_free()
+
+		remove_child(trailer)
+		trailer.queue_free()
+
+	driver.trailer = null
+
 	if driver.truck != null and is_instance_valid(driver.truck):
 		remove_child(driver.truck)
 		driver.truck.queue_free()
@@ -748,15 +776,19 @@ func _refresh_exceptions() -> void:
 			var a := on_road[i]
 			var b := on_road[j]
 			var collide := may_collide(a, b)
-			var ta := a.truck as PhysicsBody3D
-			var tb := b.truck as PhysicsBody3D
 
-			if collide:
-				ta.remove_collision_exception_with(tb)
-				tb.remove_collision_exception_with(ta)
-			else:
-				ta.add_collision_exception_with(tb)
-				tb.add_collision_exception_with(ta)
+			# Every body of one against every body of the other: a trailer is a truck too.
+			for ba: Node in [a.truck, a.trailer]:
+				for bb: Node in [b.truck, b.trailer]:
+					if ba == null or bb == null or not is_instance_valid(ba) or not is_instance_valid(bb):
+						continue
+
+					if collide:
+						(ba as PhysicsBody3D).remove_collision_exception_with(bb)
+						(bb as PhysicsBody3D).remove_collision_exception_with(ba)
+					else:
+						(ba as PhysicsBody3D).add_collision_exception_with(bb)
+						(bb as PhysicsBody3D).add_collision_exception_with(ba)
 
 
 func _clear_of_others(driver: Driver) -> bool:

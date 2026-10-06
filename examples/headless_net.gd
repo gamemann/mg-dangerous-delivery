@@ -11,8 +11,8 @@ const DdTruck := preload("res://game/dd_truck.gd")
 const DdTrip := preload("res://game/dd_trip.gd")
 const DdWeather := preload("res://game/dd_weather.gd")
 
-const SECTIONS := 9
-const CHECKS := 30
+const SECTIONS := 10
+const CHECKS := 32
 
 const CLIENT_PEER := 7
 const SESSION := 42
@@ -48,6 +48,7 @@ func _ready() -> void:
 		await _test_refusal()
 		await _test_bots()
 		await _test_rock()
+	await _test_a_trailer()
 
 	print("")
 	print("%d sections entered, %d finished" % [_entered, _finished])
@@ -278,6 +279,26 @@ func _test_rock() -> void:
 	_exchange()
 	await _steps(2)
 	_check(_client_bridge.entity_count() == 1, "and goes when it goes")
+	_finished_section()
+
+
+func _test_a_trailer() -> void:
+	_section("a trailer")
+	var _c := _server_game.bank.credit(_key, 100000, "test")
+	_client_bridge.ask_act("buy_truck", {"truck": "semi"})
+	_exchange()
+	await _steps(2)
+	_client_bridge.ask_act("start", {"route": "dd_foothills"})
+	_exchange()
+	await _steps(8)
+	_exchange()
+	await _steps(4)
+	var mirror: DdGame.Driver = _client_game.drivers[_key]
+	_check(mirror.trailer != null and (mirror.trailer as RigidBody3D).freeze, "a client mirrors the Semi's trailer, frozen")
+	var server_trailer: Node3D = (_server_game.drivers[_key] as DdGame.Driver).trailer
+	_client_net.interpolate_frame(1.0)
+	_check(server_trailer != null and (mirror.trailer as Node3D).global_position.distance_to(server_trailer.global_position) < 1.0,
+		"where the server's is")
 	_finished_section()
 
 

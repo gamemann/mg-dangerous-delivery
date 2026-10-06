@@ -36,6 +36,14 @@ const DEFAULTS := [
 		"friction_slip": 2.8, "rear_grip_fraction": 0.9, "centre_of_mass_drop": 0.5,
 	},
 	{
+		"id": "semi", "name": "Semi", "model": "truck.glb", "scale": 1.9,
+		"blurb": "A tractor and a trailer. The half you are not steering cuts every corner.",
+		"price": 6500, "pay": 1.9, "mass": 7000.0, "engine_force": 40000.0, "top_speed": 21.0,
+		"brake_force": 11500.0, "steering_limit_deg": 32.0, "steering_speed_falloff": 0.3,
+		"friction_slip": 2.9, "rear_grip_fraction": 0.95, "centre_of_mass_drop": 0.5,
+		"trailer": {"length": 6.5, "mass": 2600.0},
+	},
+	{
 		"id": "bulk", "name": "Bulk Carrier", "model": "garbage-truck.glb", "scale": 2.0,
 		"blurb": "The most it can carry, the least it can steer. Pays like it.",
 		"price": 9000, "pay": 2.1, "mass": 11000.0, "engine_force": 43200.0, "top_speed": 18.0,

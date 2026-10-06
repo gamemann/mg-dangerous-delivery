@@ -150,6 +150,9 @@ extends DotConfig
 ## Whether trucks collide with each other at all, for players who are not solo.
 @export var trucks_collide: bool = true
 
+## Whether trucks that come with a trailer (the Semi) pull one. Off turns every truck rigid.
+@export var trailers: bool = true
+
 ## Stand-in drivers, so a server is not an empty mountain. People replace them.
 @export_range(0, 16, 1) var bots: int = 0
 

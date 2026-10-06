@@ -22,6 +22,7 @@ const DdTruckNet := preload("dd_truck_net.gd")
 
 const DdGame := preload("../dd_game.gd")
 const DdTruck := preload("../dd_truck.gd")
+const DdTrailer := preload("../dd_trailer.gd")
 const DdTrip := preload("../dd_trip.gd")
 
 const CHANNEL := "delivery.net"
@@ -257,6 +258,9 @@ func _driver_body(key: StringName) -> Dictionary:
 		body["def"] = truck.def
 		body["route"] = String((driver.trip as DdTrip).route_id)
 
+		if driver.trailer != null:
+			body["trailer_net_id"] = int(_net_of.get(driver.trailer, 0))
+
 	return body
 
 
@@ -281,6 +285,13 @@ func _on_trip_started(key: StringName, _route: StringName) -> void:
 	behaviour.body = driver.truck
 	var net_id := _replicate(behaviour, driver.truck, peer_of(key))
 
+	# The trailer is a body of its own: a client draws it where the server's is, swinging.
+	if driver.trailer != null:
+		var trailer_net := DdBodyNet.new()
+		trailer_net.name = "Net"
+		trailer_net.body = driver.trailer
+		var _t := _replicate(trailer_net, driver.trailer, 0)
+
 	if net_id != 0:
 		_broadcast_driver(key)
 		_send_trip(key)
@@ -289,7 +300,11 @@ func _on_trip_started(key: StringName, _route: StringName) -> void:
 ## A truck left the road: its entity goes. [param announce] sends the driver's new state.
 func _on_truck_gone(key: StringName, announce: bool = true) -> void:
 	for body: Node in _net_of.keys():
-		if body is DdTruck and (body as DdTruck).owner_key == key:
+		if not is_instance_valid(body):
+			_net_of.erase(body)
+			continue
+
+		if (body is DdTruck and (body as DdTruck).owner_key == key) or (body is DdTrailer and String(body.name) == "Trailer_%s" % String(key)):
 			_forget(body)
 
 	if announce and game.drivers.has(key):
@@ -631,6 +646,7 @@ func _apply_driver(data: Dictionary) -> void:
 	elif current == null or int(_net_of.get(current, 0)) != net_id:
 		_drop_mirror_truck(key)
 		_mirror_truck(driver, net_id, StringName(str(data.get("truck_id", ""))), data.get("def", {}))
+		_mirror_trailer(driver, int(data.get("trailer_net_id", 0)), data.get("def", {}))
 
 	driver_changed.emit(key)
 
@@ -655,8 +671,33 @@ func _mirror_truck(driver: DdGame.Driver, net_id: int, truck_id: StringName, def
 	var _id := _replicate(behaviour, truck, 0, net_id)
 
 
+## The trailer, mirrored: drawn where the server's is, frozen like every mirrored body.
+func _mirror_trailer(driver: DdGame.Driver, net_id: int, def: Variant) -> void:
+	if net_id == 0 or not (def is Dictionary) or not ((def as Dictionary).get("trailer") is Dictionary):
+		return
+
+	var trailer := DdTrailer.new()
+	trailer.configure((def as Dictionary)["trailer"], (driver.truck as DdTruck).half_length if driver.truck != null else 2.8, 2.5, game.draws)
+	trailer.freeze = true
+	trailer.name = "Trailer_%s" % String(driver.key)
+	game.add_child(trailer)
+	driver.trailer = trailer
+	var behaviour := DdBodyNet.new()
+	behaviour.name = "Net"
+	behaviour.body = trailer
+	var _id := _replicate(behaviour, trailer, 0, net_id)
+
+
 func _drop_mirror_truck(key: StringName) -> void:
 	var driver: DdGame.Driver = game.drivers.get(key, null)
+
+	if driver != null and driver.trailer != null:
+		var trailer: Node = driver.trailer
+		driver.trailer = null
+		_forget(trailer)
+
+		if is_instance_valid(trailer):
+			trailer.queue_free()
 
 	if driver == null or driver.truck == null:
 		return

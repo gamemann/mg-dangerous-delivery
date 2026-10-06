@@ -22,7 +22,7 @@ You start in the lot with a box truck and no money. Pick a route, set off, and g
 
 **What a trip pays** is the route's pay, raised for its level, multiplied by the truck's pay (harder trucks pay more), raised for every kind of bad weather and every rockfall you actually drove through, scaled by how much of the load arrived, and with a bonus for a run with no falls and no skips. The lot shows each route's starting pay; the HUD shows what the trip pays right now.
 
-**Money buys trucks and upgrades.** Four trucks — Box Truck (free), Flatbed, Hauler, Bulk Carrier — each slower to stop, quicker to slide or longer round a hairpin than the last, and paying more for it. Each has three levels of engine, brakes and tyres.
+**Money buys trucks and upgrades.** Five trucks — Box Truck (free), Flatbed, Hauler, Semi (a tractor with an articulated trailer), Bulk Carrier — each slower to stop, quicker to slide or longer round a hairpin than the last, and paying more for it. Each has three levels of engine, brakes and tyres.
 
 **Hazards**: rock that comes off the cliff ahead of you, black ice, and fallen rock blocking a lane.
 
@@ -79,7 +79,7 @@ The shipped routes are written by `tools/build_routes.py` (`--check` fails if a 
 
 ```bash
 godot --headless --path . --import
-godot --headless --path . res://examples/headless_run.tscn   # 14 sections, 79 checks
+godot --headless --path . res://examples/headless_run.tscn   # 15 sections, 84 checks
 godot --headless --path . res://examples/headless_net.tscn   # a server and a client, 30 checks
 godot --headless --path . res://examples/dedicated.tscn      # a real server and the module, 19 checks
 tools/drive.sh                                                # a stand-in delivers every route

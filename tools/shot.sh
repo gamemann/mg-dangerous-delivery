@@ -15,7 +15,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 mkdir -p screenshots
 
-view="garage"; seconds="6"; out=""; route="dd_foothills"; sky=""; at="0"
+view="garage"; seconds="6"; out=""; route="dd_foothills"; sky=""; at="0"; truck=""
 for arg in "$@"; do
     case "$arg" in
         --view=*)    view="${arg#*=}" ;;
@@ -24,10 +24,11 @@ for arg in "$@"; do
         --route=*)   route="${arg#*=}" ;;
         --sky=*)     sky="${arg#*=}" ;;
         --at=*)      at="${arg#*=}" ;;
+        --truck=*)   truck="${arg#*=}" ;;
         *)           echo "unknown argument: $arg" >&2; exit 2 ;;
     esac
 done
 [ -n "$out" ] || out="res://screenshots/${view}.png"
 
 exec xvfb-run -a "${GODOT:-godot}" --fixed-fps 60 --path . --resolution 1280x720 \
-    res://tools/shot.tscn -- "--seconds=$seconds" "--view=$view" "--out=$out" "--route=$route" "--sky=$sky" "--at=$at"
+    res://tools/shot.tscn -- "--seconds=$seconds" "--view=$view" "--out=$out" "--route=$route" "--sky=$sky" "--at=$at" "--truck=$truck"
