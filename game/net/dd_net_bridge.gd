@@ -70,6 +70,7 @@ var rtt_source: Callable = Callable()
 var key_fn: Callable = Callable()
 
 var _player_of_peer: Dictionary = {}
+var _key_of_session: Dictionary = {}
 var _peer_of_key: Dictionary = {}
 var _ready_peers: Dictionary = {}
 var _next_bot_session: int = FIRST_BOT_SESSION
@@ -172,8 +173,25 @@ func add_player(peer_id: int, session_id: int, display_name: String) -> DotResul
 
 	_player_of_peer[peer_id] = key
 	_peer_of_key[key] = peer_id
+	_key_of_session[session_id] = key
 	var _driver := game.join(key, display_name)
 	return DotResult.success(key)
+
+
+## A name that arrived after the driver was seated — dot-platform admits AFTER the seat, so
+## the first name is the session's whenever the profile store is slower than the join — or an
+## operator's rename later. The driver takes it and everybody is sent the DRIVER again, which a
+## client already applies to a driver it knows.
+func rename(session_id: int, display_name: String) -> bool:
+	var key: StringName = _key_of_session.get(session_id, &"")
+	var driver: DdGame.Driver = game.drivers.get(key, null) if game != null else null
+
+	if driver == null or display_name == "" or driver.name == display_name:
+		return false
+
+	driver.name = display_name
+	_broadcast_driver(key)
+	return true
 
 
 func add_bot(display_name: String) -> StringName:
@@ -192,6 +210,10 @@ func remove_peer(peer_id: int) -> void:
 	if key != &"":
 		_peer_of_key.erase(key)
 		game.leave(key)
+
+		for session_id: int in _key_of_session.keys():
+			if _key_of_session[session_id] == key:
+				_key_of_session.erase(session_id)
 
 	if net != null and net.peers().has(peer_id):
 		var _gone := net.remove_peer(peer_id)

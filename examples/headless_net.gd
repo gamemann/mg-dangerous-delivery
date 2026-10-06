@@ -12,7 +12,7 @@ const DdTrip := preload("res://game/dd_trip.gd")
 const DdWeather := preload("res://game/dd_weather.gd")
 
 const SECTIONS := 10
-const CHECKS := 32
+const CHECKS := 33
 
 const CLIENT_PEER := 7
 const SESSION := 42
@@ -162,6 +162,13 @@ func _test_joining() -> void:
 	_check(_client_game.seed_value == _server_game.seed_value, "it has the weather's seed")
 	_check((_client_bridge.garage_view.get("routes", []) as Array).size() == 5 and int(_client_bridge.garage_view.get("money", -1)) == 0,
 		"and its garage")
+	# The site's name, arriving after the seat as dot-platform's admission does.
+	var renamed := _server_bridge.rename(SESSION, "Ada Lovelace")
+	_exchange()
+	await _steps(2)
+	var known: DdGame.Driver = _client_game.drivers.get(_key, null)
+	_check(renamed and known != null and known.name == "Ada Lovelace" and _client_game.drivers.size() == _server_game.drivers.size(),
+		"a name that arrives later reaches the client, as the same driver", known.name if known != null else "")
 	_finished_section()
 
 

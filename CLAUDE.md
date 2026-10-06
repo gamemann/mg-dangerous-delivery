@@ -38,7 +38,7 @@ game/
 routes/            five routes, written by tools/build_routes.py
 assets/kenney/trucks/  four Car Kit trucks and their atlas, CC0
 scenes/            dd_server.tscn
-examples/          headless_run (15 sections, 84 checks), headless_net (10, 32), dedicated (6, 19)
+examples/          headless_run (15 sections, 84 checks), headless_net (10, 33), dedicated (6, 19)
 tools/             build_routes.py; drive.sh/.gd (a stand-in delivers every route); shot.sh/.gd (render)
 ```
 
@@ -72,7 +72,7 @@ The brief says eighteen-wheelers. The Semi (`DdTrucks`, `"trailer": {length, mas
 
 Nothing is predicted (dot-vehicle's decision for rigid bodies), so the bridge is a fraction of the other games'. A client sends what it is pressing as four bytes a tick behind a snapshot ack (`DdEvents.write_drive`), unreliably; the server drives with the latest. Trucks and boulders are `DotNetIdentity`s with `Authority.SERVER`, always relevant, replicated by `DdBodyNet` (pose, interpolated) and `DdTruckNet` (plus steering and signed km/h); a client creates the body on a DRIVER or BODY event and keeps it frozen. HELLO carries the seed, the route documents and the settings a client's own weather needs; after that a client builds every road and computes every zone's sky itself, and `headless_net` checks the nine zones agree. The rest — DRIVER, GONE, TRIP (to the owner, six a second), GARAGE, SAY, WEATHER, BODY — is JSON, because it is a few hundred bytes a second and a garage view that grows a field should be a change in one place. Every garage button and key is one ACT request answered by `DdBridgeActs.run`, which an offline client calls directly: one table, so offline and online cannot mean different things by "skip".
 
-Money is keyed by the session's account uid (`uid:…`), which dot-server has at connect; the platform's profile arrives after seating, too late to key by. The bank's store is `DdModule.bank_file` (JSON) unless a host sets `DdModule.bank_driver` to a dot-moderation SQL driver.
+**Names are the site's**: `DdModule._make_identity` is dot-platform's `DotPlatformIdentity` with no avatar schema (nobody is drawn; a player is their truck), and since admission finishes after the seat, `player_admitted` and `player_renamed` end in `DdNetBridge.rename`, a DRIVER again. Money is keyed by the session's account uid (`uid:…`), which dot-server has at connect; the platform's profile arrives after seating, too late to key by. The bank's store is `DdModule.bank_file` (JSON) unless a host sets `DdModule.bank_driver` to a dot-moderation SQL driver.
 
 ## What running and rendering found
 
@@ -90,7 +90,7 @@ godot --headless --path . --import
 find . -name '*.gd' -not -path './.godot/*' -not -path './addons/*' | while read f; do
     godot --headless --path . --check-only --script "res://${f#./}"; done
 godot --headless --path . res://examples/headless_run.tscn   # 15 sections, 84 checks, ~35 s
-godot --headless --path . res://examples/headless_net.tscn   # 10 sections, 32 checks: server and client over loopback
+godot --headless --path . res://examples/headless_net.tscn   # 10 sections, 33 checks: server and client over loopback
 godot --headless --path . res://examples/dedicated.tscn      # 6 sections, 19 checks: a real DotServer and the module by path
 tools/build_routes.py --check
 tools/drive.sh                     # every route delivered by a stand-in; TRUCK=bulk too (2026-10-06)
@@ -104,7 +104,6 @@ Each suite's check total was armed by being wrong once (headless_run 74/72, head
 In the order they are worth doing.
 
 1. **A browser look.** `examples/delivery_client` in dot-server-deploy proves the pack, the socket and the driving; nobody has driven it in the web shell. Then publish: the pack is `tmc/delivery` (`content/delivery/`), and the release order is the family's (addons tagged, shell, then the game).
-2. **The platform layer**: names come from the session today (`_make_identity` returns null); dot-platform's identity would give them the site's names. (dot-stats and achievements are in: `DdProgress`.)
-3. **A mountain behind the cliffs.** The drop is now a rock slope to the water with Kenney pines and rocks on it (MultiMeshes, drawn only, placed from a hash). A hillside above each cliff was built and taken out: made per segment it overlapped the road wherever the road turned toward it, drawn from both sides it was a dark slab across the sky, from one side its trees floated. It needs real terrain (a heightfield under the whole route), not ribbons.
-4. **Other trucks' engines**: `DdSounds` is the local truck's (engine pitch with speed, load with throttle, brake hiss, rain, wind, rock, the depot); a positional engine on each mirrored truck is not done.
-5. **The GitHub repository** (gamemann/mg-dangerous-delivery) is the owner's to create; the remote is set and nothing is pushed.
+2. **A mountain behind the cliffs.** The drop is now a rock slope to the water with Kenney pines and rocks on it (MultiMeshes, drawn only, placed from a hash). A hillside above each cliff was built and taken out: made per segment it overlapped the road wherever the road turned toward it, drawn from both sides it was a dark slab across the sky, from one side its trees floated. It needs real terrain (a heightfield under the whole route), not ribbons.
+3. **Other trucks' engines**: `DdSounds` is the local truck's (engine pitch with speed, load with throttle, brake hiss, rain, wind, rock, the depot); a positional engine on each mirrored truck is not done.
+4. **The GitHub repository** (gamemann/mg-dangerous-delivery) is the owner's to create; the remote is set and nothing is pushed.

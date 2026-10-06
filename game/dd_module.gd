@@ -72,8 +72,11 @@ func _make_services() -> Node:
 
 
 ## No platform identity layer yet: names come from the session. See CLAUDE.md.
+## Profiles and names: dot-platform's identity, with no avatar schema, because nobody in this
+## game is drawn — a player is their truck. What it gives is the site's name over the
+## session's, and admission; authentication is the host's, as for every game.
 func _make_identity() -> Node:
-	return null
+	return DotPlatformIdentity.new()
 
 
 func _game_load() -> DotResult:
@@ -99,6 +102,11 @@ func _game_load() -> DotResult:
 
 	if bridge != null:
 		bridge.connect("say_requested", _on_say_requested)
+
+	# Admission finishes after the seat, so the real name arrives as `player_admitted`; an
+	# operator's `platform_name` is `player_renamed`. Both are a DRIVER again.
+	hook_post("player_admitted", _on_profile)
+	hook_post("player_renamed", _on_profile)
 
 	_build_progress(world)
 
@@ -237,3 +245,10 @@ func describe() -> Dictionary:
 		out.merge({"world": (game as DdGame).describe()}, true)
 
 	return out
+
+
+func _on_profile(event: DotEvent) -> void:
+	var session := server.session_by_userid(event.get_int("userid")) if server != null else null
+
+	if session != null and bridge != null:
+		var _renamed: bool = bridge.call("rename", session.userid, session.display_name)
