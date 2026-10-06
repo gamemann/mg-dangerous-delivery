@@ -11,6 +11,19 @@
 # dependency is the repository that has to ignore its link.
 /addons/dot_core
 /addons/dot_vehicle
+/addons/dot_ui
+/addons/dot_stats
+/addons/dot_platform
+/addons/dot_user_avatar
+/addons/dot_user
+/addons/dot_auth
+/addons/dot_cloud
+/addons/dot_moderation
+/addons/dot_voice
+/addons/dot_chat
+/addons/dot_game
+/addons/dot_server
+/addons/dot_net
 
 # Exports
 build/

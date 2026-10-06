@@ -1,5 +1,8 @@
-# This game's descriptor. NOT YET LOADABLE BY A SERVER (2026-10-06): the game has no module,
-# no server scene and no bridge yet; it runs offline (`godot --path .`). See CLAUDE.md.
+# This game's descriptor: what a server runs when it installs this repository's pack. It
+# travels inside the pack; content_id, version and kind are stamped by the installer.
+#
+# Paths are relative to the pack's mount point, which is also this repository's root.
+# Not yet in dot-server-deploy's content/ (2026-10-06): this game has not been published.
 
 content_id: gamemann/mg-dangerous-delivery
 version: 0.0.0
@@ -8,4 +11,9 @@ kind: pack
 name: Dangerous Delivery
 max_players: 16
 
+scene: scenes/dd_server.tscn
 client_scene: game/dd.tscn
+module: game/dd_module.gd
+
+cvars:
+  dd_bots: "2"

@@ -28,6 +28,8 @@ You start in the lot with a box truck and no money. Pick a route, set off, and g
 
 ## Running a server
 
+The game is a dot-server pack: `scenes/dd_server.tscn` is the world, `game/dd_module.gd` the module (see `game.yml`). Console commands: `dd_status`, `dd_bank`, `dd_weather clear|rain|snow|wind|off`, `dd_give <name> <amount>`; cvars `dd_bots`, `dd_solo`, `dd_skip`, `dd_rocks`, `dd_collide`.
+
 Every rule is a setting, layered like everything in the family: defaults < `user://cfg/delivery.json` < `DD_*` environment < `--dd-*` command line. The ones an owner most often changes:
 
 | Setting | Default | |
@@ -75,6 +77,8 @@ The shipped routes are written by `tools/build_routes.py` (`--check` fails if a 
 ```bash
 godot --headless --path . --import
 godot --headless --path . res://examples/headless_run.tscn   # 13 sections, 72 checks
+godot --headless --path . res://examples/headless_net.tscn   # a server and a client, 30 checks
+godot --headless --path . res://examples/dedicated.tscn      # a real server and the module, 19 checks
 tools/drive.sh                                                # a stand-in delivers every route
 tools/shot.sh --view=drive --route=dd_snowline --sky=snow     # look at it
 ```

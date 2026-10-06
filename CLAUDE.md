@@ -4,7 +4,7 @@ Drive a loaded truck up mountain roads with no rails, through weather and fallin
 
 Read the family-wide conventions in [`../../CLAUDE.md`](../../CLAUDE.md) first, and dot-vehicle's `CLAUDE.md` before touching how a truck drives. This file is only about what this game decides.
 
-**Built 2026-10-06, in one session, offline-first.** The world, the routes, the trucks, the bank, the garage, the HUD and the client are here and playable (`godot --path .`); the networked half (a `DotGameModule`, a bridge, a client mirror) is not, and is the first thing on the list below.
+**Built 2026-10-06, in one session.** Offline first (the world, routes, trucks, bank, garage, HUD, client; `godot --path .`), then the networked half the same day: a `DotGameModule`, a bridge, a mirroring client, and a dedicated suite against a real `DotServer`. Not yet joined by a real client over a real socket, and not published: see the list at the bottom.
 
 ## What this game is, versus the others
 
@@ -25,11 +25,16 @@ game/
   dd_game.gd       the world: every route side by side, drivers, trips, falls, rock, solo, stand-ins, garage_view()
   dd_hud.gd        the stage strip, the numbers, the keys, a message line
   dd_garage.gd     the lot: routes, trucks, upgrades; asks through a callable and is told
-  dd_client.gd     one player offline: camera (chase/cab/high), controls, weather particles, visibility
+  dd_client.gd     one player: offline it owns the world, connected it mirrors one; camera, controls, particles, visibility
+  dd_module.gd     the DotGameModule: netcode numbers, cvars (dd_bots, dd_solo, dd_skip, dd_rocks, dd_collide), dd_status/dd_bank/dd_weather/dd_give, stand-ins, the bank's store
+  dd_services.gd   chat (all, admin, whisper), push-to-talk voice, moderation, over dot-game's base
+  dd_server.gd     what scenes/dd_server.tscn runs: the world, drawing nothing
   dd_paths.gd      mount-aware paths (mg-deathrun's DrPaths)
+  net/             dd_events (kinds; JSON bodies; the 4-byte drive), dd_event/dd_request, dd_net_link (copied), dd_body_net / dd_truck_net (pose, steering, speed), dd_net_bridge
 routes/            five routes, written by tools/build_routes.py
 assets/kenney/trucks/  four Car Kit trucks and their atlas, CC0
-examples/          headless_run (13 sections, 72 checks)
+scenes/            dd_server.tscn
+examples/          headless_run (13 sections, 72 checks), headless_net (9, 30), dedicated (6, 19)
 tools/             build_routes.py; drive.sh/.gd (a stand-in delivers every route); shot.sh/.gd (render)
 ```
 
@@ -53,12 +58,19 @@ A rock site comes down when a driving truck is `boulder_trigger_distance` short 
 
 `DdGame._refresh_exceptions` makes every pair of trucks collide unless either is solo, either is a ghost, or `trucks_collide` is off — both ways, recomputed whenever a truck appears, goes, or changes. `DdGame.sees(viewer, other)`: a solo viewer sees nobody; a solo truck is hidden from others unless `solo_hidden_from_others` is off (a truck others can see and drive through is a ghost, which is worse than one that is not there). Chat is not touched by it.
 
+## Decision 5: the wire carries trucks in snapshots and everything else as JSON
+
+Nothing is predicted (dot-vehicle's decision for rigid bodies), so the bridge is a fraction of the other games'. A client sends what it is pressing as four bytes a tick behind a snapshot ack (`DdEvents.write_drive`), unreliably; the server drives with the latest. Trucks and boulders are `DotNetIdentity`s with `Authority.SERVER`, always relevant, replicated by `DdBodyNet` (pose, interpolated) and `DdTruckNet` (plus steering and signed km/h); a client creates the body on a DRIVER or BODY event and keeps it frozen. HELLO carries the seed, the route documents and the settings a client's own weather needs; after that a client builds every road and computes every zone's sky itself, and `headless_net` checks the nine zones agree. The rest — DRIVER, GONE, TRIP (to the owner, six a second), GARAGE, SAY, WEATHER, BODY — is JSON, because it is a few hundred bytes a second and a garage view that grows a field should be a change in one place. Every garage button and key is one ACT request answered by `DdBridgeActs.run`, which an offline client calls directly: one table, so offline and online cannot mean different things by "skip".
+
+Money is keyed by the session's account uid (`uid:…`), which dot-server has at connect; the platform's profile arrives after seating, too late to key by. The bank's store is `DdModule.bank_file` (JSON) unless a host sets `DdModule.bank_driver` to a dot-moderation SQL driver.
+
 ## What running and rendering found
 
 - **The road had no collision.** `PackedVector3Array` is copy-on-write in GDScript: the faces appended in a helper went into a copy, and the first truck fell from the start line.
 - **The road surface was culled.** Godot's front face is clockwise; the quads were written counter-clockwise, and the first render showed the cream underside of the slab through the road.
 - **The garage and the HUD were zero-sized in the top-left**: `set_anchors_preset` without offsets, under a CanvasLayer.
 - **Hairpins had the drop on the inside**, where every truck cuts the corner; a stand-in fell 41 times in one bend. `build_routes.py`'s `hairpin()` puts the cliff inside, always.
+- **Two stand-ins put on one start line jammed** at full throttle (2 m in 4 s, found by `dedicated`): their ghost time ran out while they still overlapped. A ghost now lasts until it is clear of every other truck.
 - **A scene with a parse error hangs** (the family's rule): `tools/drive.gd` with `:=` on an untyped receiver ran until its timeout.
 
 ## Validating
@@ -68,20 +80,23 @@ godot --headless --path . --import
 find . -name '*.gd' -not -path './.godot/*' -not -path './addons/*' | while read f; do
     godot --headless --path . --check-only --script "res://${f#./}"; done
 godot --headless --path . res://examples/headless_run.tscn   # 13 sections, 72 checks, ~25 s
+godot --headless --path . res://examples/headless_net.tscn   # 9 sections, 30 checks: server and client over loopback
+godot --headless --path . res://examples/dedicated.tscn      # 6 sections, 19 checks: a real DotServer and the module by path
 tools/build_routes.py --check
 tools/drive.sh                     # every route delivered by a stand-in; TRUCK=bulk too (2026-10-06)
 tools/shot.sh; tools/shot.sh --view=drive --route=dd_snowline --sky=snow --seconds=45
 ```
 
-The suite's checks and sections were both armed by being wrong (74 declared, 72 ran; it fired).
+Each suite's check total was armed by being wrong once (headless_run 74/72, headless_net 31/30, dedicated 20/19; all fired).
 
 ## Still to do
 
 In the order they are worth doing.
 
-1. **Networking.** A `DotGameModule` (mg-deathrun's is the closest skeleton), a bridge that sends the route documents and the seed once and the trucks' transforms per snapshot (dot-vehicle's `DotVehicleNetSync`, interpolated, not predicted), requests for the garage (start, buy, select, upgrade, skip, restart, respawn, solo) answered by `DdGame`, and a client that mirrors instead of owning the world. Chat, voice and moderation through `DotGameServices`; the bank's store from the server's config (JSON or a dot-moderation SQL driver). `game.yml`, `scenes/dd_server.tscn`, a dedicated suite.
-2. **dot-stats**: deliveries, distance, falls, money earned, per player, reported like mg-deathrun's `DrProgress`.
+1. **A real client on a real socket**, the way mg-wipeout is checked: a `content/delivery/` and a `delivery_client` example in dot-server-deploy, joining a server that loaded the pack, and a browser look. Nothing in this repository has been through the shell yet.
+2. **The platform layer and dot-stats**: names and avatars come from the session today (`_make_identity` returns null); dot-platform's identity, and dot-stats: deliveries, distance, falls, money earned, per player, reported like mg-deathrun's `DrProgress`.
 3. **Scenery.** The mountain is the road and its cliff; there is no terrain beyond, and the other routes show as pale walls in the distance. Kenney's Nature Kit has rocks and trees.
 4. **A trailer.** The brief says 18-wheelers; Kenney has none, and an articulated trailer on a `Generic6DOFJoint3D` is a real physics job (jack-knifing is the point of it).
 5. **Sounds**: engine, brakes, a boulder, the depot.
-6. **The GitHub repository** (gamemann/mg-dangerous-delivery) is the owner's to create; the remote is set and nothing is pushed.
+6. **Chat in the client.** The services and the wire carry chat; the client has no chat box yet (mg-deathrun's `DrClientChat` is the one to copy).
+7. **The GitHub repository** (gamemann/mg-dangerous-delivery) is the owner's to create; the remote is set and nothing is pushed.

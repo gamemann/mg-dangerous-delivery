@@ -15,6 +15,12 @@ const DdRoute := preload("dd_route.gd")
 const DdTrip := preload("dd_trip.gd")
 const DdTruck := preload("dd_truck.gd")
 const DdWeather := preload("dd_weather.gd")
+const DdNetBridge := preload("net/dd_net_bridge.gd")
+const DdTruckNet := preload("net/dd_truck_net.gd")
+
+## Where dot-server's client publishes its link before the game scene loads. Present: this
+## client is connected; absent: it is offline and owns its world.
+const LINK_SERVICE := &"dot_client_link"
 
 const CHANNEL := "delivery.client"
 
@@ -43,16 +49,30 @@ var _sun: DirectionalLight3D = null
 var _env: Environment = null
 var _look := Vector3.ZERO
 
+var net: DotNetManager = null
+var bridge: DdNetBridge = null
+var link: Node = null
+var _offline: bool = true
+
 
 func _ready() -> void:
 	_build_environment()
 
+	link = DotRegistry.get_node_service(LINK_SERVICE)
+	_offline = link == null or OS.get_cmdline_user_args().has("--offline")
+
 	game = DdGame.new()
 	game.name = "World"
 	game.draws = true
-	game.authoritative = true
+	game.authoritative = _offline
+	# A connected client's world is a mirror: not registered (a server in the same process
+	# would fight it for the name) and not ticking itself (the bridge ticks it on the clock).
+	game.register_service = _offline
+	game.self_tick = _offline
 	add_child(game)
-	var _me := game.join(local_key, local_name)
+
+	if _offline:
+		var _me := game.join(local_key, local_name)
 
 	camera = Camera3D.new()
 	camera.name = "Camera"
@@ -74,6 +94,11 @@ func _ready() -> void:
 	garage.name = "Garage"
 	garage.act = _act
 	layer.add_child(garage)
+
+	if not _offline:
+		_show_garage(true)
+		DotLog.result(CHANNEL, "the netcode", _build_netcode())
+		return
 
 	game.stage_reached.connect(func(key: StringName, stage: int) -> void:
 		if key == local_key:
@@ -103,45 +128,124 @@ func _ready() -> void:
 
 
 func _driver() -> DdGame.Driver:
-	return game.drivers.get(local_key, null)
+	return game.drivers.get(local_key, null) if game != null else null
+
+
+# --- Connected ---------------------------------------------------------------
+
+## The netcode, built inside `_ready`, which runs inside the shell's scene load: up before the
+## server has been told anybody is here, so nothing it sends is missed (mg-buses-from-hell).
+func _build_netcode() -> DotResult:
+	net = DotNetManager.new()
+	net.name = "Net"
+	net.is_server = false
+	net.local_peer_id = multiplayer.get_unique_id() if multiplayer != null else 2
+	net.auto_tick = false
+	net.config_file = ""
+	var config := DotNetConfig.new()
+	config.tick_rate = Engine.physics_ticks_per_second
+	config.snapshot_rate = DdGame.NET_SNAPSHOT_RATE
+	config.world_extent = DdGame.NET_WORLD_EXTENT
+	config.enable_prediction = false
+	config.enable_lag_compensation = false
+	config.max_entities_per_snapshot = 96
+	net.config = config
+	add_child(net)
+	var started := net.setup()
+
+	if not started.ok:
+		return started
+
+	bridge = DdNetBridge.new()
+	bridge.name = "Bridge"
+	add_child(bridge)
+	var attached := bridge.attach(game, net)
+
+	if not attached.ok:
+		return attached
+
+	bridge.open_link(link)
+	net.messages.seal()
+
+	bridge.hello_received.connect(func(key: StringName) -> void:
+		local_key = key
+		_frame_garage_camera())
+	bridge.garage_received.connect(func(view: Dictionary) -> void:
+		hud.show_money(int(view.get("money", 0)))
+		garage.refresh(view))
+	bridge.trip_received.connect(func(view: Dictionary) -> void:
+		var on_road := bool(view.get("on_road", false))
+
+		if on_road == garage.visible:
+			_show_garage(not on_road)
+
+		hud.show_solo(bool(view.get("solo", false))))
+	bridge.said.connect(func(text: String, tone: String) -> void:
+		var colour: Color = {"good": Color(1.0, 0.85, 0.3), "bad": Color(1.0, 0.4, 0.35), "money": Color(0.55, 0.95, 0.5)}.get(tone, Color(1.0, 0.7, 0.4))
+
+		if garage.visible:
+			garage.notice(text)
+		else:
+			hud.say(text, 3.0, colour))
+
+	if link.has_method("ping_ms"):
+		bridge.rtt_source = func() -> float: return float(maxi(0, int(link.call("ping_ms"))))
+
+	# READY once the scene exists, never before: what the server sent in between would land on
+	# a node that does not exist yet.
+	if link.has_method("is_playing") and bool(link.call("is_playing")):
+		bridge.ask_ready()
+	elif link.has_signal("spawned"):
+		link.connect("spawned", func() -> void: bridge.ask_ready(), CONNECT_ONE_SHOT)
+
+	return net.start()
 
 
 # --- The garage --------------------------------------------------------------
 
-func _act(action: String, args: Dictionary) -> void:
-	var done: DotResult = null
-	var acct := game.bank.account(local_key)
+func _act(action: String, args: Dictionary = {}) -> void:
+	if not _offline:
+		if bridge != null:
+			bridge.ask_act(action, args)
 
-	match action:
-		"start":
-			done = game.start_trip(local_key, StringName(str(args.get("route", ""))))
+		# The garage closes on the server's say-so (a TRIP saying we are on the road), not here.
+		if action == "garage":
+			_show_garage(true)
 
-			if done.ok:
-				_show_garage(false)
+		return
 
-				if autopilot:
-					var me := _driver()
-					me.is_bot = true
-					me.autopilot = DotVehicleDriver.new()
-					me.autopilot.target_speed = 10.0
-					me.autopilot.set_route(game._global_points(me.trip.route_id, 4.0))
-		"buy_truck":
-			done = game.buy_truck(local_key, StringName(str(args["truck"])))
-		"select_truck":
-			done = game.select_truck(local_key, StringName(str(args["truck"])))
-		"upgrade":
-			done = game.buy_upgrade(local_key, StringName(str(acct["truck"])), str(args["kind"]))
+	var body := args.duplicate()
+	body["action"] = action
+	var done: DotResult = DdNetBridge.DdBridgeActs.run(game, local_key, body)
 
-	if done != null and not done.ok:
-		garage.notice(done.error.message)
-	elif done != null:
+	if action == "start" and done.ok:
+		_show_garage(false)
+
+		if autopilot:
+			var me := _driver()
+			me.is_bot = true
+			me.autopilot = DotVehicleDriver.new()
+			me.autopilot.target_speed = 10.0
+			me.autopilot.set_route(game._global_points(me.trip.route_id, 4.0))
+	elif action == "garage":
+		_show_garage(true)
+
+	if not done.ok:
+		if garage.visible:
+			garage.notice(done.error.message)
+		else:
+			_say_refusal(done)
+	else:
 		garage.notice("")
 
 	_refresh_garage()
 
 
 func _refresh_garage() -> void:
-	garage.refresh(game.garage_view(local_key))
+	if _offline:
+		garage.refresh(game.garage_view(local_key))
+	elif bridge != null and not bridge.garage_view.is_empty():
+		garage.refresh(bridge.garage_view)
 
 
 func _show_garage(on: bool) -> void:
@@ -172,24 +276,19 @@ func _unhandled_input(event: InputEvent) -> void:
 	if key == null or not key.pressed or key.echo:
 		return
 
-	var me := _driver()
-
 	match key.keycode:
 		KEY_B:
-			if me != null:
-				var _s := game.set_solo(local_key, not me.solo)
+			_act("solo")
 		KEY_R:
-			_say_refusal(game.respawn(local_key))
+			_act("respawn")
 		KEY_T:
-			_say_refusal(game.restart(local_key))
+			_act("restart")
 		KEY_N:
-			_say_refusal(game.skip(local_key))
+			_act("skip")
 		KEY_C:
 			camera_mode = (camera_mode + 1) % 3 as CameraMode
 		KEY_G, KEY_ESCAPE:
-			game.end_trip(local_key)
-			_refresh_garage()
-			_show_garage(true)
+			_act("garage")
 
 
 func _say_refusal(result: DotResult) -> void:
@@ -197,35 +296,70 @@ func _say_refusal(result: DotResult) -> void:
 		hud.say(result.error.message, 2.0, Color(1.0, 0.7, 0.4))
 
 
-func _physics_process(_delta: float) -> void:
+func _physics_process(delta: float) -> void:
 	var me := _driver()
+	command = _sample(me)
 
-	if me == null or not me.on_road() or garage.visible or me.is_bot:
+	if _offline:
+		if me != null and me.on_road() and not garage.visible and not me.is_bot:
+			game.set_command(local_key, command)
+
 		return
 
-	command = DotVehicleCommand.new()
+	if net == null or not net.is_running() or bridge == null:
+		return
+
+	var ticks := net.clock.advance(delta)
+
+	for i in range(ticks):
+		if net.clock.is_synced():
+			bridge.client_tick(net.clock.input_tick() - (ticks - 1 - i), command)
+
+
+## What the keys say, as a command. Idle in the garage, so a truck is not driven from a menu.
+func _sample(me: DdGame.Driver) -> DotVehicleCommand:
+	var out := DotVehicleCommand.new()
+
+	if me == null or me.truck == null or garage.visible:
+		out.brake = 1.0
+		return out
+
 	var forward := Input.get_action_strength("ui_up") + (1.0 if Input.is_key_pressed(KEY_W) else 0.0)
 	var back := Input.get_action_strength("ui_down") + (1.0 if Input.is_key_pressed(KEY_S) else 0.0)
 	var left := Input.get_action_strength("ui_left") + (1.0 if Input.is_key_pressed(KEY_A) else 0.0)
 	var right := Input.get_action_strength("ui_right") + (1.0 if Input.is_key_pressed(KEY_D) else 0.0)
-	var speed := (me.truck as DdTruck).forward_speed()
+	var speed := _speed_of(me)
 
 	# One key for slowing down and reversing, which is how every driving game does it: brake
 	# while still rolling forward, reverse once stopped.
 	if back > 0.0 and speed > 0.8:
-		command.brake = clampf(back, 0.0, 1.0)
-		command.throttle = 0.0
+		out.brake = clampf(back, 0.0, 1.0)
 	else:
-		command.throttle = clampf(forward, 0.0, 1.0) - clampf(back, 0.0, 1.0)
+		out.throttle = clampf(forward, 0.0, 1.0) - clampf(back, 0.0, 1.0)
 
-	command.steer = clampf(right - left, -1.0, 1.0)
-	command.handbrake = Input.is_key_pressed(KEY_SPACE)
-	game.set_command(local_key, command)
+	out.steer = clampf(right - left, -1.0, 1.0)
+	out.handbrake = Input.is_key_pressed(KEY_SPACE)
+	return out
+
+
+## Forward speed: the body's own offline, the replicated one on a mirror (a frozen body has none).
+func _speed_of(me: DdGame.Driver) -> float:
+	if me == null or me.truck == null:
+		return 0.0
+
+	if _offline:
+		return (me.truck as DdTruck).forward_speed()
+
+	var behaviour := me.truck.get_node_or_null("Net") as DdTruckNet
+	return behaviour.speed_ms() if behaviour != null else 0.0
 
 
 # --- Every frame -------------------------------------------------------------
 
 func _process(delta: float) -> void:
+	if net != null and net.is_running():
+		net.interpolate_frame(-1.0)
+
 	var me := _driver()
 
 	for k: StringName in game.drivers:
@@ -234,24 +368,47 @@ func _process(delta: float) -> void:
 		if other.truck != null and is_instance_valid(other.truck):
 			(other.truck as Node3D).visible = game.sees(me, other)
 
-	if me == null or not me.on_road():
+	var facts := _trip_facts(me)
+
+	if facts.is_empty():
 		_set_weather({"sky": DdWeather.CLEAR, "wind": false})
 		return
 
-	var trip: DdTrip = me.trip
-	var truck: DdTruck = me.truck
-	var road: DdRoute = game.routes[trip.route_id]
-	var weather := game.weather_at(trip.route_id, trip.distance)
-	var zone_id := road.zone_at(trip.distance)
-	var zone_name := str((road.doc.get("zones", {}) as Dictionary).get(zone_id, {}).get("name", ""))
+	hud.show_trip(facts)
+	_set_weather(facts["weather"])
 
-	hud.show_trip({
-		"stage": trip.stage, "stages": trip.stages, "fraction": trip.distance / maxf(road.length(), 1.0),
-		"cargo": trip.cargo, "speed": truck.forward_speed(), "offer": trip.pay_now(game.config),
-		"weather": weather, "zone": zone_name, "state": trip.state_name(),
-	})
-	_set_weather(weather)
-	_follow(truck, delta)
+	if me != null and me.truck != null:
+		_follow(me.truck as DdTruck, delta)
+
+
+## What the HUD shows: from the trip this client holds offline, from the server's TRIP online.
+func _trip_facts(me: DdGame.Driver) -> Dictionary:
+	if me == null or me.truck == null:
+		return {}
+
+	if _offline:
+		if me.trip == null:
+			return {}
+
+		var trip: DdTrip = me.trip
+		var road: DdRoute = game.routes[trip.route_id]
+		var zone_id := road.zone_at(trip.distance)
+		return {
+			"stage": trip.stage, "stages": trip.stages, "fraction": trip.distance / maxf(road.length(), 1.0),
+			"cargo": trip.cargo, "speed": _speed_of(me), "offer": trip.pay_now(game.config),
+			"weather": game.weather_at(trip.route_id, trip.distance), "state": trip.state_name(),
+			"zone": str((road.doc.get("zones", {}) as Dictionary).get(zone_id, {}).get("name", "")),
+		}
+
+	var view: Dictionary = bridge.trip_view if bridge != null else {}
+
+	if not bool(view.get("on_road", false)):
+		return {}
+
+	var out := view.duplicate()
+	out["speed"] = _speed_of(me)
+	out["weather"] = game.weather_at(StringName(str(view.get("route", ""))), float(view.get("distance", 0.0)))
+	return out
 
 
 func _follow(truck: DdTruck, delta: float) -> void:

@@ -28,6 +28,14 @@ const DdWeather := preload("dd_weather.gd")
 const DdPaths := preload("dd_paths.gd")
 
 const CHANNEL := "delivery.game"
+
+## The netcode's numbers, which are the game's: a module and a client both read them here, so
+## the two ends cannot quantise positions against different ranges.
+const NET_SNAPSHOT_RATE := 30
+
+## Metres from the origin a replicated position may be. Every route is laid out inside it;
+## [method build_routes] warns about one that is not.
+const NET_WORLD_EXTENT := 4096.0
 const SERVICE := &"delivery.game"
 
 ## Metres between routes when they are laid side by side.
@@ -45,6 +53,9 @@ signal delivered(key: StringName, route_id: StringName, pay: int)
 signal trip_ended(key: StringName)
 signal solo_changed(key: StringName, on: bool)
 signal boulder_dropped(route_id: StringName, at: Vector3)
+## A boulder body exists, and one went: the bridge replicates the first and forgets the second.
+signal boulder_made(body: RigidBody3D)
+signal boulder_gone(body: RigidBody3D)
 signal weather_changed(route_id: StringName, zone: String, weather: Dictionary)
 signal driver_joined(key: StringName)
 signal driver_left(key: StringName)
@@ -241,6 +252,9 @@ func build_routes() -> void:
 		next_x += (hi - lo) + ROUTE_GAP
 		routes[id] = route
 		route_order.append(id)
+
+		if next_x > NET_WORLD_EXTENT:
+			DotLog.warn(CHANNEL, "a route lies outside what the netcode can place", {"route": String(id), "x": next_x})
 
 	_refresh_weather(true)
 
@@ -565,7 +579,10 @@ func _step_driver(driver: Driver, delta: float) -> void:
 	var road: DdRoute = routes[trip.route_id]
 	var local := truck.global_position - road.position
 
-	if driver.ghost_until > 0.0 and _now >= driver.ghost_until:
+	# A ghost becomes solid only once it is clear of every other truck. A fixed time was the
+	# first version, and two stand-ins put on the same start line stopped being ghosts while
+	# they were still inside each other and jammed there (dedicated: 2 m in 4 s at full throttle).
+	if driver.ghost_until > 0.0 and _now >= driver.ghost_until and _clear_of_others(driver):
 		driver.ghost_until = 0.0
 		_refresh_exceptions()
 
@@ -728,6 +745,23 @@ func _refresh_exceptions() -> void:
 			else:
 				ta.add_collision_exception_with(tb)
 				tb.add_collision_exception_with(ta)
+
+
+func _clear_of_others(driver: Driver) -> bool:
+	var truck := driver.truck as DdTruck
+
+	for key: StringName in drivers:
+		var other: Driver = drivers[key]
+
+		if other == driver or other.truck == null or not is_instance_valid(other.truck):
+			continue
+
+		var reach := truck.half_length + (other.truck as DdTruck).half_length + 1.0
+
+		if truck.global_position.distance_to((other.truck as Node3D).global_position) < reach:
+			return false
+
+	return true
 
 
 func may_collide(a: Driver, b: Driver) -> bool:
@@ -903,6 +937,7 @@ func _step_boulders(delta: float) -> void:
 
 		if _now - float(entry["born"]) > 14.0 or body.global_position.y < float(entry["floor"]):
 			boulders.erase(body)
+			boulder_gone.emit(body)
 			body.queue_free()
 
 
@@ -953,6 +988,7 @@ func _drop_boulder(route_id: StringName, road: DdRoute, site: Dictionary, lead_s
 	# Across, with enough time in the air that it lands on the road near when the truck does.
 	body.linear_velocity = across * config.boulder_speed * clampf(2.5 / maxf(lead_seconds, 0.5), 0.6, 1.4)
 	boulders[body] = {"route": route_id, "born": _now, "floor": road.position.y + road.lowest_point() - 80.0}
+	boulder_made.emit(body)
 
 	for k: StringName in drivers:
 		var driver: Driver = drivers[k]
