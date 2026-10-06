@@ -147,6 +147,17 @@ extends DotConfig
 ## Stand-in drivers, so a server is not an empty mountain. People replace them.
 @export_range(0, 16, 1) var bots: int = 0
 
+@export_group("Progress")
+
+## Whether a server counts drivers' numbers and achievements at all.
+@export var keep_progress: bool = true
+
+## Whether they are reported to TMC's backbone (when the server has one).
+@export var report_progress: bool = true
+
+## Where achievement progress is kept between sessions. Empty keeps it in memory.
+@export var progress_directory: String = "user://delivery_achievements"
+
 @export_group("World")
 
 ## Gravity, written onto the world's own physics space.

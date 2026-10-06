@@ -71,6 +71,9 @@ class Driver:
 	var trip: RefCounted = null
 	var command: DotVehicleCommand = DotVehicleCommand.new()
 	var autopilot: DotVehicleDriver = null
+	## A person whose wheel is handed to [member autopilot] (a screenshot, a suite). Not a
+	## stand-in: their deliveries pay and count. A stand-in is [member is_bot].
+	var assisted: bool = false
 	var ghost_until: float = 0.0
 	## Seconds a stand-in waits at the depot before its next trip.
 	var idle: float = 0.0
@@ -564,7 +567,7 @@ func step(delta: float) -> void:
 	for key: StringName in drivers:
 		var driver: Driver = drivers[key]
 
-		if driver.is_bot:
+		if driver.is_bot or driver.assisted:
 			_drive_bot(driver, delta)
 
 		if driver.on_road():
@@ -793,6 +796,10 @@ func _global_points(route_id: StringName, from_d: float) -> PackedVector3Array:
 # --- Stand-ins ---------------------------------------------------------------
 
 func _drive_bot(driver: Driver, delta: float) -> void:
+	# Somebody assisted only has the wheel taken; choosing a route and going home are theirs.
+	if driver.assisted and not driver.on_road():
+		return
+
 	if not driver.on_road():
 		driver.idle -= delta
 

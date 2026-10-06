@@ -15,9 +15,10 @@ const DdTrucks := preload("res://game/dd_trucks.gd")
 const DdTruck := preload("res://game/dd_truck.gd")
 const DdBank := preload("res://game/dd_bank.gd")
 const DdTrip := preload("res://game/dd_trip.gd")
+const DdProgress := preload("res://game/dd_progress.gd")
 
 const SECTIONS := 13
-const CHECKS := 72
+const CHECKS := 75
 
 var _passed := 0
 var _failed := 0
@@ -25,6 +26,8 @@ var _failures: PackedStringArray = PackedStringArray()
 var _entered := 0
 var _finished := 0
 var game: DdGame = null
+var progress: DdProgress = null
+var _earned: Array = []
 
 
 func _ready() -> void:
@@ -42,6 +45,10 @@ func _ready() -> void:
 	game.config.respawn_seconds = 0.3
 	game.config.seed_value = 77
 	add_child(game)
+	progress = DdProgress.new()
+	add_child(progress)
+	var _p := progress.setup(game, "", false)
+	progress.earned.connect(func(key: StringName, title: String, _points: int) -> void: _earned.append([key, title]))
 
 	_test_unlocking()
 	await _test_a_delivery()
@@ -258,7 +265,7 @@ func _test_a_delivery() -> void:
 	for i in stages - 1:
 		var _s := game.skip(&"p1")
 	_check((me.trip as DdTrip).stage == stages - 1 and (me.trip as DdTrip).skips == stages - 1, "skipping counts every stage it skips")
-	me.is_bot = true
+	me.assisted = true
 	me.idle = 999.0
 	me.autopilot = DotVehicleDriver.new()
 	me.autopilot.target_speed = 11.0
@@ -273,7 +280,12 @@ func _test_a_delivery() -> void:
 	_check(paid[0] > 0, "the stand-in reaches the depot and it pays", "%d after %.0f m" % [paid[0], (me.trip as DdTrip).distance])
 	_check(game.bank.money(&"p1") == paid[0] and game.bank.has_delivered(&"p1", &"dd_foothills"), "the pay is in the bank and the route is marked")
 	_check(game.is_unlocked(&"p1", &"dd_river_cut"), "and level 2 is open")
-	me.is_bot = false
+	await get_tree().process_frame
+	var numbers := progress.session_values(&"p1")
+	_check(numbers.get_value(DdProgress.DELIVERIES) == 1.0 and numbers.get_value(DdProgress.EARNED) == float(paid[0]),
+		"dot-stats counts the delivery and what it paid", str(numbers.to_dictionary()))
+	_check(_earned.has([&"p1", "First Load"]), "and the first one is an achievement", str(_earned))
+	me.assisted = false
 	me.autopilot = null
 	game.end_trip(&"p1")
 	_check(not me.on_road(), "back to the garage, and the truck is gone")
@@ -304,6 +316,7 @@ func _test_a_fall() -> void:
 	_check(trip.state == DdTrip.State.DRIVING and absf(road.distance_at((me.truck as Node3D).global_position - road.position) - road.checkpoint_distance(trip.stage)) < 3.0,
 		"and it is put back on its checkpoint")
 	_check(trip.pay_now(game.config) < _clean_offer(trip), "a fall loses the clean-run bonus")
+	_check(progress.session_values(&"p1").get_value(DdProgress.FALLS) == 1.0, "and is counted")
 	_finished_section()
 
 

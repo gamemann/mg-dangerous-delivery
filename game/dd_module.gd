@@ -11,6 +11,7 @@ const DdNetBridge := preload("net/dd_net_bridge.gd")
 const DdServices := preload("dd_services.gd")
 const DdGame := preload("dd_game.gd")
 const DdBank := preload("dd_bank.gd")
+const DdProgress := preload("dd_progress.gd")
 
 ## Seconds between checks of how many stand-ins there should be.
 const ROSTER_INTERVAL := 2.0
@@ -22,6 +23,9 @@ static var bank_driver: Object = null
 
 ## Where the money is kept without a database.
 static var bank_file: String = "user://delivery_accounts.json"
+
+## Drivers' numbers and achievements, or null when the server keeps none.
+var progress: DdProgress = null
 
 var _bots: DotConVar = null
 var _bot_keys: Array[StringName] = []
@@ -96,8 +100,33 @@ func _game_load() -> DotResult:
 	if bridge != null:
 		bridge.connect("say_requested", _on_say_requested)
 
+	_build_progress(world)
+
 	_wire_map(world)
 	return DotResult.success(null)
+
+
+## dot-stats and dot-achievements over the world's own signals; told to the driver who earned it.
+func _build_progress(world: DdGame) -> void:
+	if not world.config.keep_progress:
+		return
+
+	progress = DdProgress.new()
+	progress.name = "Progress"
+	add_child(progress)
+	var made := progress.setup(world, world.config.progress_directory, world.config.report_progress)
+
+	if not made.ok:
+		DotLog.result(CHANNEL, "progress is off", made)
+		progress.queue_free()
+		progress = null
+		return
+
+	progress.earned.connect(func(key: StringName, title: String, points: int) -> void:
+		var peer: int = bridge.call("peer_of", key) if bridge != null else 0
+
+		if peer > 0:
+			bridge.call("notice", peer, "Achievement: %s (+%d)" % [title, points]))
 
 
 func _tunable_bool(cvar_name: String, current: bool, description: String, apply: Callable) -> void:

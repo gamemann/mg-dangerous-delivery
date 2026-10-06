@@ -227,7 +227,7 @@ func _act(action: String, args: Dictionary = {}) -> void:
 
 		if autopilot:
 			var me := _driver()
-			me.is_bot = true
+			me.assisted = true
 			me.autopilot = DotVehicleDriver.new()
 			me.autopilot.target_speed = 10.0
 			me.autopilot.set_route(game._global_points(me.trip.route_id, 4.0))
@@ -305,7 +305,7 @@ func _physics_process(delta: float) -> void:
 	command = _sample(me)
 
 	if _offline:
-		if me != null and me.on_road() and not garage.visible and not me.is_bot:
+		if me != null and me.on_road() and not garage.visible and not me.assisted:
 			game.set_command(local_key, command)
 
 		return
