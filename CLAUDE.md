@@ -4,7 +4,7 @@ Drive a loaded truck up mountain roads with no rails, through weather and fallin
 
 Read the family-wide conventions in [`../../CLAUDE.md`](../../CLAUDE.md) first, and dot-vehicle's `CLAUDE.md` before touching how a truck drives. This file is only about what this game decides.
 
-**Built 2026-10-06, in one session.** Offline first (the world, routes, trucks, bank, garage, HUD, client; `godot --path .`), then the networked half the same day: a `DotGameModule`, a bridge, a mirroring client, and a dedicated suite against a real `DotServer`. Not yet joined by a real client over a real socket, and not published: see the list at the bottom.
+**Built 2026-10-06, in one session.** Offline first (the world, routes, trucks, bank, garage, HUD, client; `godot --path .`), then the networked half the same day: a `DotGameModule`, a bridge, a mirroring client, and a dedicated suite against a real `DotServer`. Joined by a real client over a real socket in a delivered pack (dot-server-deploy's `examples/delivery_client`, 18 checks); not yet seen in a browser, and not published: see the list at the bottom.
 
 ## What this game is, versus the others
 
@@ -93,7 +93,7 @@ Each suite's check total was armed by being wrong once (headless_run 74/72, head
 
 In the order they are worth doing.
 
-1. **A real client on a real socket**, the way mg-wipeout is checked: a `content/delivery/` and a `delivery_client` example in dot-server-deploy, joining a server that loaded the pack, and a browser look. Nothing in this repository has been through the shell yet.
+1. **A browser look.** `examples/delivery_client` in dot-server-deploy proves the pack, the socket and the driving; nobody has driven it in the web shell. Then publish: the pack is `tmc/delivery` (`content/delivery/`), and the release order is the family's (addons tagged, shell, then the game).
 2. **The platform layer and dot-stats**: names and avatars come from the session today (`_make_identity` returns null); dot-platform's identity, and dot-stats: deliveries, distance, falls, money earned, per player, reported like mg-deathrun's `DrProgress`.
 3. **Scenery.** The mountain is the road and its cliff; there is no terrain beyond, and the other routes show as pale walls in the distance. Kenney's Nature Kit has rocks and trees.
 4. **A trailer.** The brief says 18-wheelers; Kenney has none, and an articulated trailer on a `Generic6DOFJoint3D` is a real physics job (jack-knifing is the point of it).
