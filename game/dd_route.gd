@@ -16,6 +16,13 @@ extends Node3D
 
 const DdRouteDoc := preload("dd_route_doc.gd")
 const DdWeather := preload("dd_weather.gd")
+const DdPaths := preload("dd_paths.gd")
+
+## How far out the drop's slope runs to the water. Drawn only: nothing stands on it.
+const DROP_OUT := 38.0
+
+const TREES := ["tree_pineTallA", "tree_pineDefaultA", "tree_pineRoundA", "tree_cone_dark", "tree_cone"]
+const ROCKS := ["rock_largeA", "rock_largeC", "rock_tallB", "rock_tallE", "stone_largeB"]
 
 const CHANNEL := "delivery.route"
 
@@ -38,6 +45,9 @@ const RAIL_HEIGHT := 0.9
 const PAD_SIZE := Vector2(36.0, 44.0)
 
 var doc: Dictionary = {}
+
+## Whether the scenery is built: off on a server, which has nobody to show a pine tree to.
+var draws: bool = true
 
 ## The samples: position, heading (yaw, radians), distance along, segment index.
 var points: PackedVector3Array = PackedVector3Array()
@@ -383,6 +393,9 @@ func _build_geometry() -> void:
 		_build_gate(checkpoints[i], "%d" % (i + 1))
 
 	_build_gate(length() - 1.0, "DEPOT")
+
+	if draws:
+		_build_scenery()
 	_build_ice()
 	_build_debris()
 	_build_water()
@@ -402,6 +415,7 @@ func _build_segment(index: int, from_i: int, to_i: int) -> void:
 	var rock := SurfaceTool.new()
 	road.begin(Mesh.PRIMITIVE_TRIANGLES)
 	rock.begin(Mesh.PRIMITIVE_TRIANGLES)
+
 
 	var wall := str(seg["wall"])
 	var rail := str(seg["rail"])
@@ -432,10 +446,16 @@ func _build_segment(index: int, from_i: int, to_i: int) -> void:
 		# collided — nothing stands on a cliff face, and a truck going over should fall.
 		var deep := Vector3(0.0, -SKIRT_DEPTH, 0.0)
 
+		# The drop: a rock slope down to the water rather than a sheer sheet, so the road reads
+		# as cut into a mountainside and a truck going over has something to tumble down.
 		if wall != "left" and wall != "both":
-			_quad(rock, false, l0 + down, l0 + deep, l1 + deep, l1 + down, false)
+			var out0 := -right_of(yaws[i]) * DROP_OUT
+			var out1 := -right_of(yaws[i + 1]) * DROP_OUT
+			_quad(rock, false, l0 + down, l0 + deep + out0, l1 + deep + out1, l1 + down, false)
 		if wall != "right" and wall != "both":
-			_quad(rock, false, r1 + down, r1 + deep, r0 + deep, r0 + down, false)
+			var out0 := right_of(yaws[i]) * DROP_OUT
+			var out1 := right_of(yaws[i + 1]) * DROP_OUT
+			_quad(rock, false, r1 + down, r1 + deep + out1, r0 + deep + out0, r0 + down, false)
 
 		var rail_up := Vector3(0.0, RAIL_HEIGHT, 0.0)
 
@@ -449,6 +469,7 @@ func _build_segment(index: int, from_i: int, to_i: int) -> void:
 	road.generate_normals()
 	rock.generate_normals()
 
+
 	var road_mesh := MeshInstance3D.new()
 	road_mesh.name = "Road%d" % index
 	road_mesh.mesh = road.commit()
@@ -460,6 +481,8 @@ func _build_segment(index: int, from_i: int, to_i: int) -> void:
 	rock_mesh.mesh = rock.commit()
 	rock_mesh.material_override = _rock_material()
 	add_child(rock_mesh)
+
+
 
 
 ## The centre line, dashed: three metres on, three off, a hair above the surface.
@@ -479,8 +502,8 @@ func _dash(road: SurfaceTool, i: int) -> void:
 	road.set_color(Color(1, 1, 1))
 
 
-func _quad(st: SurfaceTool, collides: bool, a: Vector3, b: Vector3, c: Vector3, d: Vector3, _solid: bool) -> void:
-	st.set_color(Color(1, 1, 1))
+func _quad(st: SurfaceTool, collides: bool, a: Vector3, b: Vector3, c: Vector3, d: Vector3, _solid: bool, tint: Color = Color(1, 1, 1)) -> void:
+	st.set_color(tint)
 	# Wound a-c-b: Godot's front face is clockwise seen from the front, and the quads above are
 	# written counter-clockwise. The first render showed the road's own surface culled and the
 	# cream underside of the slab through it.
@@ -509,10 +532,14 @@ func _zone_material(zone: String) -> StandardMaterial3D:
 var _rock: StandardMaterial3D = null
 
 
+
 func _rock_material() -> StandardMaterial3D:
 	if _rock == null:
 		_rock = StandardMaterial3D.new()
-		_rock.albedo_color = Color(0.62, 0.55, 0.47)
+		# Darker than a rock's real colour: under the filmic tonemap and a clear sky the first
+		# renders read every slope as snow.
+		_rock.albedo_color = Color(0.4, 0.36, 0.31)
+
 		_rock.roughness = 1.0
 		_rock.cull_mode = BaseMaterial3D.CULL_DISABLED
 		# Noise, projected from all three axes, so a cliff reads as rock at any angle without a
@@ -611,6 +638,99 @@ func _build_gate(d: float, label: String) -> void:
 	text.position = Vector3(0.0, 6.2, 0.15)
 	text.rotation.y = PI
 	gate.add_child(text)
+
+
+## Pines on the mountainside above every cliff and rocks down every drop, as one MultiMesh per
+## model: a route has a hundred or more, and a node each is a browser's frame budget gone.
+## Placed from a hash of the route and the sample, so every client sees the same mountain.
+func _build_scenery() -> void:
+	var placements := {}
+	var id_text := str(doc.get("id", ""))
+	var i := 3
+
+	while i < points.size() - 3:
+		var seg: Dictionary = doc["segments"][segment_of[i]]
+		var wall := str(seg["wall"])
+		var width: float = seg["width"]
+		var roll := DdWeather.unit("%s|tree|%d" % [id_text, i])
+
+		for side: float in [-1.0, 1.0]:
+			var cliff: bool = wall == "both" or (wall == "left" and side < 0.0) or (wall == "right" and side > 0.0)
+			var out: Vector3 = right_of(yaws[i]) * side
+			var edge: Vector3 = points[i] + out * width * 0.5
+
+			# On the drop only: pines growing out of the slope below the road, and rock further
+			# down. A mountainside above each cliff was tried and taken out: built per segment, it
+			# overlapped the road wherever the road turned toward it, drawn from both sides it
+			# was a dark slab across the sky, and drawn from one its trees floated.
+			if cliff:
+				continue
+
+			var down := 4.0 + roll * 44.0
+			var at: Vector3 = edge + out * (down / SKIRT_DEPTH * DROP_OUT) + Vector3(0, -SLAB - down, 0)
+
+			if roll < 0.55:
+				_place(placements, TREES[int(roll * 997.0) % TREES.size()], at, roll * TAU, 3.4 + roll * 2.0)
+			elif roll > 0.82:
+				_place(placements, ROCKS[int(roll * 991.0) % ROCKS.size()], at, roll * TAU, 4.0 + roll * 6.0)
+
+		i += 4
+
+	for model: String in placements:
+		var mesh := _scenery_mesh(model)
+
+		if mesh == null:
+			continue
+
+		var list: Array = placements[model]
+		var multi := MultiMesh.new()
+		multi.transform_format = MultiMesh.TRANSFORM_3D
+		multi.mesh = mesh
+		multi.instance_count = list.size()
+
+		for k in list.size():
+			multi.set_instance_transform(k, list[k])
+
+		var node := MultiMeshInstance3D.new()
+		node.name = "Scenery_%s" % model
+		node.multimesh = multi
+
+		# Rocks in the cliff's own rock: Kenney's pale grey read as ice under this sun.
+		if ROCKS.has(model):
+			node.material_override = _rock_material()
+		node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		add_child(node)
+
+
+func _place(placements: Dictionary, model: String, at: Vector3, turn: float, size: float) -> void:
+	if not placements.has(model):
+		placements[model] = []
+
+	(placements[model] as Array).append(Transform3D(Basis(Vector3.UP, turn).scaled(Vector3.ONE * size), at))
+
+
+static var _scenery_meshes: Dictionary = {}
+
+
+## The first mesh in a Kenney model, with its materials: what a MultiMesh draws.
+static func _scenery_mesh(model: String) -> Mesh:
+	if _scenery_meshes.has(model):
+		return _scenery_meshes[model]
+
+	var path := DdPaths.rebase("res://assets/kenney/nature/%s.glb" % model)
+	var mesh: Mesh = null
+
+	if ResourceLoader.exists(path):
+		var scene := (load(path) as PackedScene).instantiate()
+		var found := scene.find_children("*", "MeshInstance3D", true, false)
+
+		if not found.is_empty():
+			mesh = (found[0] as MeshInstance3D).mesh
+
+		scene.free()
+
+	_scenery_meshes[model] = mesh
+	return mesh
 
 
 ## Black ice: a glossy pale sheet a hair above the road. Drawn so it can be seen, because ice

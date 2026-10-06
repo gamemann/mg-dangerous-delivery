@@ -242,6 +242,7 @@ func build_routes() -> void:
 	for id: StringName in ids:
 		var route := DdRoute.new()
 		route.name = "Route_%s" % String(id)
+		route.draws = draws
 		add_child(route)
 		var _built := route.build(documents[id])
 		var lo := INF

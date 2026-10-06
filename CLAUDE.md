@@ -105,6 +105,6 @@ In the order they are worth doing.
 
 1. **A browser look.** `examples/delivery_client` in dot-server-deploy proves the pack, the socket and the driving; nobody has driven it in the web shell. Then publish: the pack is `tmc/delivery` (`content/delivery/`), and the release order is the family's (addons tagged, shell, then the game).
 2. **The platform layer**: names come from the session today (`_make_identity` returns null); dot-platform's identity would give them the site's names. (dot-stats and achievements are in: `DdProgress`.)
-3. **Scenery.** The mountain is the road and its cliff; there is no terrain beyond, and the other routes show as pale walls in the distance. Kenney's Nature Kit has rocks and trees.
+3. **A mountain behind the cliffs.** The drop is now a rock slope to the water with Kenney pines and rocks on it (MultiMeshes, drawn only, placed from a hash). A hillside above each cliff was built and taken out: made per segment it overlapped the road wherever the road turned toward it, drawn from both sides it was a dark slab across the sky, from one side its trees floated. It needs real terrain (a heightfield under the whole route), not ribbons.
 4. **Other trucks' engines**: `DdSounds` is the local truck's (engine pitch with speed, load with throttle, brake hiss, rain, wind, rock, the depot); a positional engine on each mirrored truck is not done.
 5. **The GitHub repository** (gamemann/mg-dangerous-delivery) is the owner's to create; the remote is set and nothing is pushed.

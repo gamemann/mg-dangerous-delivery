@@ -89,6 +89,7 @@ tools/shot.sh --view=drive --route=dd_snowline --sky=snow     # look at it
 ## Credits
 
 - Truck models: [Kenney](https://kenney.nl) Car Kit, CC0 1.0 (`assets/kenney/trucks/`, licence beside them).
+- Pines and rocks: [Kenney](https://kenney.nl) Nature Kit, CC0 1.0 (`assets/kenney/nature/`, licence beside them).
 - Everything else is drawn in code.
 
 MIT licence; see [LICENSE](LICENSE).
