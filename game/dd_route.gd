@@ -15,6 +15,7 @@ extends Node3D
 ## asking them is asking the road that is actually there.
 
 const DdRouteDoc := preload("dd_route_doc.gd")
+const DdWeather := preload("dd_weather.gd")
 
 const CHANNEL := "delivery.route"
 
@@ -49,6 +50,14 @@ var checkpoints: PackedFloat32Array = PackedFloat32Array()
 
 ## Where rock can come down: [code]{"d": float, "side": -1 left / +1 right}[/code].
 var boulder_sites: Array = []
+
+## Black ice: [code]{"d": float, "lateral": float, "length": float, "width": float}[/code], in
+## the road's own frame. Placed from a hash of the route and the patch, so every machine lays
+## the same ones.
+var ice: Array = []
+
+## Fallen rock on the road: [code]{"d", "lateral", "size"}[/code]. Solid; a truck goes round.
+var debris: Array = []
 
 ## Zone id -> the StandardMaterial3D every road surface in it shares, so weather recolours a
 ## zone with one assignment.
@@ -87,6 +96,8 @@ func clear() -> void:
 	segment_of = PackedInt32Array()
 	checkpoints = PackedFloat32Array()
 	boulder_sites = []
+	ice = []
+	debris = []
 	zone_materials = {}
 	_body = null
 	doc = {}
@@ -133,6 +144,8 @@ func _sample() -> void:
 		if bool(seg["checkpoint"]) and index < segments.size() - 1:
 			checkpoints.append(d)
 
+		_place_hazards(index, seg, d - length_m, length_m)
+
 		var rocks := int(seg["boulders"])
 
 		if rocks > 0:
@@ -141,6 +154,45 @@ func _sample() -> void:
 
 			for r in rocks:
 				boulder_sites.append({"d": start + length_m * (float(r) + 0.5) / float(rocks), "side": side, "index": boulder_sites.size()})
+
+
+## Ice and debris along one segment, spaced evenly and moved by a hash so they are not in a
+## line. Debris takes one lane and leaves the other, always: a pile across the whole road is a
+## road nobody can drive, and the validator has no way to know it.
+func _place_hazards(index: int, seg: Dictionary, start: float, length_m: float) -> void:
+	var width: float = seg["width"]
+	var id_text := str(doc.get("id", ""))
+
+	for k in int(seg["ice"]):
+		var roll := DdWeather.unit("%s|ice|%d|%d" % [id_text, index, k])
+		ice.append({
+			"d": start + length_m * (float(k) + 0.25 + roll * 0.5) / float(int(seg["ice"])),
+			"lateral": (roll - 0.5) * width * 0.4, "length": 8.0 + roll * 6.0, "width": width * 0.55,
+		})
+
+	for k in int(seg["debris"]):
+		var roll := DdWeather.unit("%s|debris|%d|%d" % [id_text, index, k])
+		var side := -1.0 if roll < 0.5 else 1.0
+		debris.append({
+			"d": start + length_m * (float(k) + 0.5) / float(int(seg["debris"])),
+			"lateral": side * width * 0.27, "size": Vector3(width * 0.36, 1.1 + roll, 2.5 + roll * 2.0),
+		})
+
+
+## Whether [param position] (route-local) is on a patch of black ice.
+func on_ice(position: Vector3, hint: int = -1) -> bool:
+	if ice.is_empty():
+		return false
+
+	var d := distance_at(position, hint)
+	var lateral := lateral_at(position, hint)
+
+	for patch: Dictionary in ice:
+		if absf(d - float(patch["d"])) <= float(patch["length"]) * 0.5 \
+				and absf(lateral - float(patch["lateral"])) <= float(patch["width"]) * 0.5:
+			return true
+
+	return false
 
 
 static func forward_of(yaw: float) -> Vector3:
@@ -267,7 +319,16 @@ func route_points(from_d: float = 0.0, spacing: float = 8.0) -> PackedVector3Arr
 	var d := from_d
 
 	while d < length():
-		out.append(points[index_at_distance(d)])
+		var i := index_at_distance(d)
+		var p := points[i]
+
+		# Into the other lane round a pile of debris: a stand-in on the centreline drives into
+		# every pile, because a pile takes one lane and reaches nearly to the line.
+		for pile: Dictionary in debris:
+			if absf(float(pile["d"]) - d) < 16.0:
+				p -= right_of(yaws[i]) * signf(float(pile["lateral"])) * width_at(d) * 0.26
+
+		out.append(p)
 		d += spacing
 
 	out.append(points[points.size() - 1] + forward_of(yaws[yaws.size() - 1]) * 12.0)
@@ -322,6 +383,8 @@ func _build_geometry() -> void:
 		_build_gate(checkpoints[i], "%d" % (i + 1))
 
 	_build_gate(length() - 1.0, "DEPOT")
+	_build_ice()
+	_build_debris()
 	_build_water()
 
 
@@ -548,6 +611,52 @@ func _build_gate(d: float, label: String) -> void:
 	text.position = Vector3(0.0, 6.2, 0.15)
 	text.rotation.y = PI
 	gate.add_child(text)
+
+
+## Black ice: a glossy pale sheet a hair above the road. Drawn so it can be seen, because ice
+## that cannot be seen is a fall that cannot be avoided, which is not a hazard but a lottery.
+func _build_ice() -> void:
+	if ice.is_empty():
+		return
+
+	var material := StandardMaterial3D.new()
+	material.albedo_color = Color(0.72, 0.84, 0.95, 0.75)
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	material.roughness = 0.05
+	material.metallic = 0.3
+
+	for patch: Dictionary in ice:
+		var at := transform_at(float(patch["d"]), 0.03)
+		var sheet := MeshInstance3D.new()
+		sheet.name = "Ice"
+		var plane := PlaneMesh.new()
+		plane.size = Vector2(float(patch["width"]), float(patch["length"]))
+		sheet.mesh = plane
+		sheet.material_override = material
+		add_child(sheet)
+		sheet.transform = Transform3D(at.basis, at.origin + at.basis.x * float(patch["lateral"]))
+
+
+## Fallen rock: solid boxes, rock-coloured, in one lane.
+func _build_debris() -> void:
+	for pile: Dictionary in debris:
+		var at := transform_at(float(pile["d"]), 0.0)
+		var size: Vector3 = pile["size"]
+		var body := StaticBody3D.new()
+		body.name = "Debris"
+		var shape := BoxShape3D.new()
+		shape.size = size
+		var collider := CollisionShape3D.new()
+		collider.shape = shape
+		body.add_child(collider)
+		var mesh := MeshInstance3D.new()
+		var box := BoxMesh.new()
+		box.size = size
+		mesh.mesh = box
+		mesh.material_override = _rock_material()
+		body.add_child(mesh)
+		add_child(body)
+		body.transform = Transform3D(at.basis.rotated(Vector3.UP, 0.15), at.origin + at.basis.x * float(pile["lateral"]) + Vector3(0.0, size.y * 0.5, 0.0))
 
 
 func _build_water() -> void:

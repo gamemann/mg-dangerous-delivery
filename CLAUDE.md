@@ -34,7 +34,7 @@ game/
 routes/            five routes, written by tools/build_routes.py
 assets/kenney/trucks/  four Car Kit trucks and their atlas, CC0
 scenes/            dd_server.tscn
-examples/          headless_run (13 sections, 72 checks), headless_net (9, 30), dedicated (6, 19)
+examples/          headless_run (14 sections, 79 checks), headless_net (9, 30), dedicated (6, 19)
 tools/             build_routes.py; drive.sh/.gd (a stand-in delivers every route); shot.sh/.gd (render)
 ```
 
@@ -53,6 +53,8 @@ A trip's chaos is counted from what it met (`DdTrip.meet`: each zone's sky and w
 Off the mountain is `truck.y < road height at the nearest sample - fall_depth`, not a trigger volume (mg-smash-copter's reason: something falling fast steps over a volume). Flipped and still for `flipped_respawn_seconds` is a fall too. A fall costs `fall_cargo_loss` and puts the truck on its last checkpoint after `respawn_seconds`; R (respawn) costs the same, or a player about to go over would press it for free. A truck put down is a **ghost** to other trucks for `GHOST_SECONDS`, so two put on one checkpoint do not explode apart.
 
 A rock site comes down when a driving truck is `boulder_trigger_distance` short of it, on `boulder_chance`, and then not again for `boulder_cooldown_seconds` (60): at 20 s a slow truck sent back to the start was met by the same rock every time it set off and fell eleven times in a row. Rock starts above the cliff top: at 9 m up it started behind a 16 m face and the cliff caught it.
+
+**Black ice and debris are part of the road, not the weather.** A segment's `ice` and `debris` counts are laid by `DdRoute._place_hazards` from `DdWeather.unit()` of the route, segment and index, so every machine lays the same ones; ice drops grip to `ice_grip` and is paid once as `ice_chaos`, and a debris pile takes one lane and never both, because a pile across the whole road is a road nobody can drive. `route_points` swings a stand-in into the other lane round a pile.
 
 ## Decision 4: solo is collision exceptions and visibility
 
@@ -79,7 +81,7 @@ Money is keyed by the session's account uid (`uid:…`), which dot-server has at
 godot --headless --path . --import
 find . -name '*.gd' -not -path './.godot/*' -not -path './addons/*' | while read f; do
     godot --headless --path . --check-only --script "res://${f#./}"; done
-godot --headless --path . res://examples/headless_run.tscn   # 13 sections, 72 checks, ~25 s
+godot --headless --path . res://examples/headless_run.tscn   # 14 sections, 79 checks, ~25 s
 godot --headless --path . res://examples/headless_net.tscn   # 9 sections, 30 checks: server and client over loopback
 godot --headless --path . res://examples/dedicated.tscn      # 6 sections, 19 checks: a real DotServer and the module by path
 tools/build_routes.py --check

@@ -18,7 +18,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "..", "routes")
 
 
-def seg(length, turn=0, climb=0, wall="left", rail="none", zone="", checkpoint=False, boulders=0, width=None, bank=0):
+def seg(length, turn=0, climb=0, wall="left", rail="none", zone="", checkpoint=False, boulders=0, width=None, bank=0, ice=0, debris=0):
     s = {"length": float(length), "turn": float(turn), "climb": float(climb), "wall": wall, "rail": rail}
     if zone:
         s["zone"] = zone
@@ -26,6 +26,10 @@ def seg(length, turn=0, climb=0, wall="left", rail="none", zone="", checkpoint=F
         s["checkpoint"] = True
     if boulders:
         s["boulders"] = int(boulders)
+    if ice:
+        s["ice"] = int(ice)
+    if debris:
+        s["debris"] = int(debris)
     if width is not None:
         s["width"] = float(width)
     if bank:
@@ -62,7 +66,7 @@ ROUTES = [
               seg(100, -30, 8, wall="left", rail="right", zone="valley", checkpoint=True),
               seg(140, 0, 12, wall="left", rail="none", zone="valley"),
               seg(110, 45, 6, wall="right", rail="left", zone="valley", checkpoint=True),
-              seg(120, -20, 10, wall="left", zone="valley", boulders=1),
+              seg(120, -20, 10, wall="left", zone="valley", boulders=1, debris=1),
               seg(90, 30, 4, wall="left", checkpoint=True),
               seg(100, 0, 2, wall="none", rail="both"),
           ]),
@@ -73,7 +77,7 @@ ROUTES = [
               seg(70, wall="left"),
               seg(140, -35, 10, wall="left", zone="gorge"),
               seg(110, 40, 8, wall="left", zone="gorge", boulders=1, checkpoint=True),
-              seg(160, -20, 14, wall="left", zone="gorge", width=7.0),
+              seg(160, -20, 14, wall="left", zone="gorge", width=7.0, debris=1),
               seg(120, 50, 6, wall="left", zone="gorge", boulders=2, checkpoint=True),
               seg(140, -45, 12, wall="left", zone="gorge", width=6.8),
               seg(120, 20, 8, wall="left", zone="gorge", checkpoint=True),
@@ -88,10 +92,10 @@ ROUTES = [
               hairpin(-1, 6, zone="lower"),
               seg(140, 0, 16, wall="right", zone="lower", boulders=1, checkpoint=True),
               hairpin(1, 6, zone="upper"),
-              seg(140, 0, 16, wall="left", zone="upper", boulders=1),
+              seg(140, 0, 16, wall="left", zone="upper", boulders=1, ice=2),
               hairpin(-1, 6, zone="upper", width=6.8),
               seg(120, 10, 12, wall="right", zone="upper", checkpoint=True),
-              seg(150, -30, 6, wall="right", zone="upper", boulders=1),
+              seg(150, -30, 6, wall="right", zone="upper", boulders=1, ice=1, debris=1),
               seg(100, 20, 0, wall="none", zone="upper", checkpoint=True),
               seg(90, 0, -4, wall="none", rail="both"),
           ]),
@@ -104,7 +108,7 @@ ROUTES = [
               seg(160, -20, 8, wall="none", zone="ridge", width=6.5, checkpoint=True),
               seg(140, 30, 4, wall="none", zone="ridge", width=6.2),
               seg(120, -35, -6, wall="none", zone="ridge", width=6.2, checkpoint=True),
-              seg(150, 25, 10, wall="right", zone="saddle", boulders=2),
+              seg(150, 25, 10, wall="right", zone="saddle", boulders=2, ice=1),
               seg(130, -20, 6, wall="none", zone="ridge", width=6.0, checkpoint=True),
               seg(90, 0, 0, wall="none", rail="both"),
           ]),
@@ -119,11 +123,11 @@ ROUTES = [
               hairpin(1, 8, zone="gate"),
               seg(130, 0, 18, wall="left", zone="gate", boulders=1, checkpoint=True),
               hairpin(-1, 8, zone="spine", width=6.2),
-              seg(150, 20, 16, wall="none", zone="spine", width=6.0),
+              seg(150, 20, 16, wall="none", zone="spine", width=6.0, ice=2),
               seg(120, -40, 8, wall="left", zone="spine", boulders=2, checkpoint=True),
               hairpin(1, 6, zone="summit", width=6.2),
               seg(140, -15, 14, wall="none", zone="summit", width=5.8, boulders=1),
-              seg(110, 35, 6, wall="right", zone="summit", checkpoint=True),
+              seg(110, 35, 6, wall="right", zone="summit", checkpoint=True, debris=1, ice=1),
               seg(130, -10, 4, wall="none", zone="summit", width=5.8),
               seg(90, 0, 0, wall="none", rail="both"),
           ]),

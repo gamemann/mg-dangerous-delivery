@@ -69,7 +69,8 @@
 			"wall": "left",
 			"rail": "none",
 			"zone": "upper",
-			"boulders": 1
+			"boulders": 1,
+			"ice": 2
 		},
 		{
 			"length": 95.0,
@@ -96,7 +97,9 @@
 			"wall": "right",
 			"rail": "none",
 			"zone": "upper",
-			"boulders": 1
+			"boulders": 1,
+			"ice": 1,
+			"debris": 1
 		},
 		{
 			"length": 100.0,

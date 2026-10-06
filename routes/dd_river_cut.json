@@ -49,6 +49,7 @@
 			"wall": "left",
 			"rail": "none",
 			"zone": "gorge",
+			"debris": 1,
 			"width": 7.0
 		},
 		{

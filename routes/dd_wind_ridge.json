@@ -73,7 +73,8 @@
 			"wall": "right",
 			"rail": "none",
 			"zone": "saddle",
-			"boulders": 2
+			"boulders": 2,
+			"ice": 1
 		},
 		{
 			"length": 130.0,

@@ -21,6 +21,8 @@ extends RefCounted
 ## }
 ## [/codeblock]
 ##
+## `ice` and `debris` place patches and piles along a segment (see the README).
+##
 ## Every length is metres, every angle degrees (positive turns right), and a segment's
 ## `climb` is its whole rise (negative descends). `wall` is the cliff side: "left", "right",
 ## "both" or "none"; the other side is the drop. `rail` is a low barrier on a side; the
@@ -140,6 +142,8 @@ static func normalise(doc: Variant) -> DotResult:
 			"length": length, "turn": turn, "climb": climb, "width": seg_width,
 			"wall": wall, "rail": rail, "zone": zone, "checkpoint": checkpoint,
 			"boulders": clampi(int(seg.get("boulders", 0)), 0, 32),
+			"ice": clampi(int(seg.get("ice", 0)), 0, 32),
+			"debris": clampi(int(seg.get("debris", 0)), 0, 32),
 			"bank": clampf(float(seg.get("bank", 0.0)), -12.0, 12.0),
 		})
 

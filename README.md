@@ -24,6 +24,8 @@ You start in the lot with a box truck and no money. Pick a route, set off, and g
 
 **Money buys trucks and upgrades.** Four trucks — Box Truck (free), Flatbed, Hauler, Bulk Carrier — each slower to stop, quicker to slide or longer round a hairpin than the last, and paying more for it. Each has three levels of engine, brakes and tyres.
 
+**Hazards**: rock that comes off the cliff ahead of you, black ice, and fallen rock blocking a lane.
+
 **Weather is the mountain's, not yours.** Every route has zones, and each zone draws its own sky every couple of minutes: snow (the road turns white and grip drops to 40%), rain (70%), and wind that comes in gusts and pushes the truck toward the edge. Everybody on a zone has the same sky.
 
 ## Running a server
@@ -38,6 +40,7 @@ Every rule is a setting, layered like everything in the family: defaults < `user
 | `wind_strength` | 2.6 | Peak side push, m/s² |
 | `weather_frequency` | 1.0 | Multiplies every zone's chances; 0 is clear skies |
 | `boulders_enabled`, `boulder_chance` | true, 0.7 | Falling rock |
+| `ice_grip` | 0.3 | Grip on black ice |
 | `fall_cargo_loss` | 0.15 | Load lost per fall |
 | `level_pay_step`, `chaos_pay`, `clean_run_bonus` | 0.35, 0.6, 0.25 | The pay formula |
 | `allow_solo`, `solo_hidden_from_others` | true, true | Solo mode |
@@ -68,7 +71,7 @@ A route is one JSON file in `routes/`, and every one in the directory is a level
 }
 ```
 
-Lengths are metres and angles degrees (positive turns right). `climb` is a segment's whole rise. `wall` is the side the cliff is on (`left`, `right`, `both`, `none`); the other side is the drop. `rail` puts a low barrier on a side. `checkpoint` ends a stage at the end of that segment. `boulders` is how many places along it rock can come down. A bend tighter than a truck can take, or a climb steeper than 18%, is refused with the reason.
+Lengths are metres and angles degrees (positive turns right). `climb` is a segment's whole rise. `wall` is the side the cliff is on (`left`, `right`, `both`, `none`); the other side is the drop. `rail` puts a low barrier on a side. `checkpoint` ends a stage at the end of that segment. `boulders` is how many places along it rock can come down. `ice` lays that many patches of black ice (slippery in any weather, drawn as a pale sheet); `debris` that many piles of fallen rock, each blocking one lane. A bend tighter than a truck can take, or a climb steeper than 18%, is refused with the reason.
 
 The shipped routes are written by `tools/build_routes.py` (`--check` fails if a file is not what it writes), and `tools/drive.sh` has a stand-in drive every route to the depot.
 
@@ -76,7 +79,7 @@ The shipped routes are written by `tools/build_routes.py` (`--check` fails if a 
 
 ```bash
 godot --headless --path . --import
-godot --headless --path . res://examples/headless_run.tscn   # 13 sections, 72 checks
+godot --headless --path . res://examples/headless_run.tscn   # 14 sections, 79 checks
 godot --headless --path . res://examples/headless_net.tscn   # a server and a client, 30 checks
 godot --headless --path . res://examples/dedicated.tscn      # a real server and the module, 19 checks
 tools/drive.sh                                                # a stand-in delivers every route

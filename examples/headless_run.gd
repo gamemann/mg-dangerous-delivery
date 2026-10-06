@@ -17,8 +17,8 @@ const DdBank := preload("res://game/dd_bank.gd")
 const DdTrip := preload("res://game/dd_trip.gd")
 const DdProgress := preload("res://game/dd_progress.gd")
 
-const SECTIONS := 13
-const CHECKS := 75
+const SECTIONS := 14
+const CHECKS := 79
 
 var _passed := 0
 var _failed := 0
@@ -57,6 +57,7 @@ func _ready() -> void:
 	await _test_rock()
 	_test_refusals()
 	_test_pay()
+	_test_ice_and_debris()
 
 	print("")
 	print("%d sections entered, %d finished" % [_entered, _finished])
@@ -412,6 +413,29 @@ func _test_pay() -> void:
 	_check(trip.pay_now(c) < int(round(expected / 0.8)), "a skip costs")
 	_check(trip.meet("z", {"sky": DdWeather.SNOW, "wind": true}, 0.5, 0.25, 0.3) and not trip.meet("z", {"sky": DdWeather.SNOW, "wind": true}, 0.5, 0.25, 0.3),
 		"a zone's weather is paid once")
+	_finished_section()
+
+
+func _test_ice_and_debris() -> void:
+	_section("black ice and fallen rock")
+	var road: DdRoute = game.routes[&"dd_snowline"]
+	_check(road.ice.size() == 3 and road.debris.size() == 1, "the document's patches and piles are laid", "%d ice, %d debris" % [road.ice.size(), road.debris.size()])
+	var patch: Dictionary = road.ice[0]
+	var on := road.transform_at(float(patch["d"]), 0.5).origin + road.transform_at(float(patch["d"]), 0.0).basis.x * float(patch["lateral"])
+	_check(road.on_ice(on) and not road.on_ice(road.transform_at(float(patch["d"]) + 40.0, 0.5).origin), "a truck on a patch is on ice, and one past it is not")
+	var pile: Dictionary = road.debris[0]
+	var lane := 0.0
+	var waypoints := road.route_points(0.0, 8.0)
+	for p in waypoints:
+		var d := road.distance_at(p)
+		if absf(d - float(pile["d"])) < 8.0:
+			lane = road.lateral_at(p)
+	_check(lane != 0.0 and signf(lane) != signf(float(pile["lateral"])), "a stand-in's route goes round a pile, in the other lane", "%.1f vs %.1f" % [lane, float(pile["lateral"])])
+	var fresh := DdRoute.new()
+	add_child(fresh)
+	var _b := fresh.build(road.doc)
+	_check(fresh.ice == road.ice and fresh.debris == road.debris, "and every machine lays them in the same places")
+	fresh.queue_free()
 	_finished_section()
 
 

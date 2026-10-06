@@ -97,6 +97,12 @@ extends DotConfig
 ## Chaos a windy zone adds.
 @export_range(0.0, 3.0, 0.05) var wind_chaos: float = 0.3
 
+## Grip on black ice, whatever the sky.
+@export_range(0.05, 1.0, 0.01) var ice_grip: float = 0.3
+
+## Chaos a trip that crossed black ice is paid for, once.
+@export_range(0.0, 3.0, 0.05) var ice_chaos: float = 0.2
+
 ## Multiplies every zone's own chance of each weather. 0 is a server of clear skies.
 @export_range(0.0, 3.0, 0.05) var weather_frequency: float = 1.0
 

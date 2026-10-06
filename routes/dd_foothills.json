@@ -65,7 +65,8 @@
 			"wall": "left",
 			"rail": "none",
 			"zone": "valley",
-			"boulders": 1
+			"boulders": 1,
+			"debris": 1
 		},
 		{
 			"length": 90.0,

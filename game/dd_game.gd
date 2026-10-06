@@ -621,7 +621,16 @@ func _step_driver(driver: Driver, delta: float) -> void:
 	# Weather: grip, wind, and the chaos it is paid for.
 	var zone := road.zone_at(trip.distance)
 	var sky := _sky(trip.route_id, zone)
-	truck.set_grip(DdWeather.grip(sky, config.snow_grip, config.rain_grip))
+	var grip := DdWeather.grip(sky, config.snow_grip, config.rain_grip)
+
+	if road.on_ice(local, trip.hint):
+		grip = minf(grip, config.ice_grip)
+
+		if not trip.met.has("ice"):
+			trip.met["ice"] = true
+			trip.chaos_units += config.ice_chaos
+
+	truck.set_grip(grip)
 
 	if bool(sky.get("wind", false)) and config.wind_strength > 0.0:
 		var side := DdRoute.right_of(road.yaws[trip.hint])

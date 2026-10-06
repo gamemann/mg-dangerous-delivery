@@ -33,6 +33,21 @@ func _ready() -> void:
 	if sky != "":
 		var _forced: DotResult = client.game.force_weather("clear" if sky == "wind" else sky, sky == "wind")
 
+	# Put the truck this many metres along its route first: a hazard half a kilometre up a
+	# road is otherwise minutes of simulated driving under a renderer.
+	var at_m := float(_args.get("at", "0"))
+
+	if at_m > 0.0 and view != "garage":
+		await get_tree().physics_frame
+		var me = client.game.drivers[client.local_key]
+		var road = client.game.routes[me.trip.route_id]
+		var where: Transform3D = road.transform_at(at_m, 0.8)
+		where.origin += road.position
+		me.truck.place(where)
+		me.trip.distance = at_m
+		me.trip.hint = road.index_at_distance(at_m)
+		me.autopilot.set_route(client.game._global_points(me.trip.route_id, at_m))
+
 	if view == "cab":
 		client.camera_mode = DdClient.CameraMode.CAB
 	elif view == "high":
