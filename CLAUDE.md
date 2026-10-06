@@ -28,6 +28,8 @@ game/
   dd_client.gd     one player: offline it owns the world, connected it mirrors one; camera, controls, particles, visibility
   dd_module.gd     the DotGameModule: netcode numbers, cvars (dd_bots, dd_solo, dd_skip, dd_rocks, dd_collide), dd_status/dd_bank/dd_weather/dd_give, stand-ins, the bank's store
   dd_services.gd   chat (all, admin, whisper), push-to-talk voice, moderation, over dot-game's base
+  dd_client_chat.gd  the chat box (Y) and push-to-talk (V); a truck idles while its driver types
+  dd_progress.gd   dot-stats numbers and achievements, reported to the backbone
   dd_server.gd     what scenes/dd_server.tscn runs: the world, drawing nothing
   dd_paths.gd      mount-aware paths (mg-deathrun's DrPaths)
   net/             dd_events (kinds; JSON bodies; the 4-byte drive), dd_event/dd_request, dd_net_link (copied), dd_body_net / dd_truck_net (pose, steering, speed), dd_net_bridge
@@ -100,5 +102,4 @@ In the order they are worth doing.
 3. **Scenery.** The mountain is the road and its cliff; there is no terrain beyond, and the other routes show as pale walls in the distance. Kenney's Nature Kit has rocks and trees.
 4. **A trailer.** The brief says 18-wheelers; Kenney has none, and an articulated trailer on a `Generic6DOFJoint3D` is a real physics job (jack-knifing is the point of it).
 5. **Sounds**: engine, brakes, a boulder, the depot.
-6. **Chat in the client.** The services and the wire carry chat; the client has no chat box yet (mg-deathrun's `DrClientChat` is the one to copy).
-7. **The GitHub repository** (gamemann/mg-dangerous-delivery) is the owner's to create; the remote is set and nothing is pushed.
+6. **The GitHub repository** (gamemann/mg-dangerous-delivery) is the owner's to create; the remote is set and nothing is pushed.
