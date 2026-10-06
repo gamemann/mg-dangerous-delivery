@@ -30,6 +30,7 @@ game/
   dd_module.gd     the DotGameModule: netcode numbers, cvars (dd_bots, dd_solo, dd_skip, dd_rocks, dd_collide), dd_status/dd_bank/dd_weather/dd_give, stand-ins, the bank's store
   dd_services.gd   chat (all, admin, whisper), push-to-talk voice, moderation, over dot-game's base
   dd_client_chat.gd  the chat box (Y) and push-to-talk (V); a truck idles while its driver types
+  dd_sounds.gd     synthesised: a diesel whose pitch follows speed, brake hiss, rain, wind, rock, the depot chime
   dd_progress.gd   dot-stats numbers and achievements, reported to the backbone
   dd_server.gd     what scenes/dd_server.tscn runs: the world, drawing nothing
   dd_paths.gd      mount-aware paths (mg-deathrun's DrPaths)
@@ -105,5 +106,5 @@ In the order they are worth doing.
 1. **A browser look.** `examples/delivery_client` in dot-server-deploy proves the pack, the socket and the driving; nobody has driven it in the web shell. Then publish: the pack is `tmc/delivery` (`content/delivery/`), and the release order is the family's (addons tagged, shell, then the game).
 2. **The platform layer**: names come from the session today (`_make_identity` returns null); dot-platform's identity would give them the site's names. (dot-stats and achievements are in: `DdProgress`.)
 3. **Scenery.** The mountain is the road and its cliff; there is no terrain beyond, and the other routes show as pale walls in the distance. Kenney's Nature Kit has rocks and trees.
-4. **Sounds**: engine, brakes, a boulder, the depot.
+4. **Other trucks' engines**: `DdSounds` is the local truck's (engine pitch with speed, load with throttle, brake hiss, rain, wind, rock, the depot); a positional engine on each mirrored truck is not done.
 5. **The GitHub repository** (gamemann/mg-dangerous-delivery) is the owner's to create; the remote is set and nothing is pushed.

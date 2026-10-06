@@ -18,6 +18,7 @@ const DdWeather := preload("dd_weather.gd")
 const DdNetBridge := preload("net/dd_net_bridge.gd")
 const DdTruckNet := preload("net/dd_truck_net.gd")
 const DdClientChat := preload("dd_client_chat.gd")
+const DdSounds := preload("dd_sounds.gd")
 
 ## Where dot-server's client publishes its link before the game scene loads. Present: this
 ## client is connected; absent: it is offline and owns its world.
@@ -55,6 +56,7 @@ var _env: Environment = null
 var _look := Vector3.ZERO
 
 var chat: DdClientChat = null
+var sounds: DdSounds = null
 var net: DotNetManager = null
 var bridge: DdNetBridge = null
 var link: Node = null
@@ -104,6 +106,9 @@ func _ready() -> void:
 	chat = DdClientChat.new()
 	chat.name = "Chat"
 	add_child(chat)
+	sounds = DdSounds.new()
+	sounds.name = "Sounds"
+	add_child(sounds)
 
 	if not _offline:
 		_show_garage(true)
@@ -119,8 +124,13 @@ func _ready() -> void:
 	game.fell.connect(func(key: StringName, why: String) -> void:
 		if key == local_key:
 			hud.say({"fell": "OVER THE EDGE", "flipped": "ON ITS SIDE", "respawn": "BACK TO THE CHECKPOINT"}.get(why, why.to_upper()), 2.0, Color(1.0, 0.4, 0.35)))
+	game.boulder_dropped.connect(func(route_id: StringName, at: Vector3) -> void:
+		var me := _driver()
+		if me != null and me.truck != null and (me.truck as Node3D).global_position.distance_to(at) < 120.0:
+			sounds.rock())
 	game.delivered.connect(func(key: StringName, _route: StringName, pay: int) -> void:
 		if key == local_key:
+			sounds.delivered()
 			hud.say("DELIVERED  +$%d" % pay, 4.0, Color(0.55, 0.95, 0.5))
 			hud.show_money(game.bank.money(local_key)))
 	game.bank.account_changed.connect(func(key: StringName) -> void:
@@ -198,6 +208,8 @@ func _build_netcode() -> DotResult:
 		if chat != null:
 			chat.notice(text))
 	bridge.said.connect(func(text: String, tone: String) -> void:
+		if tone == "money":
+			sounds.delivered()
 		var colour: Color = {"good": Color(1.0, 0.85, 0.3), "bad": Color(1.0, 0.4, 0.35), "money": Color(0.55, 0.95, 0.5)}.get(tone, Color(1.0, 0.7, 0.4))
 
 		if garage.visible:
@@ -398,6 +410,13 @@ func _process(delta: float) -> void:
 			(other.truck as Node3D).visible = game.sees(me, other)
 
 	var facts := _trip_facts(me)
+	sounds.driving = not facts.is_empty()
+
+	if not facts.is_empty():
+		sounds.speed = float(facts.get("speed", 0.0))
+		sounds.throttle = absf(command.throttle) if command != null else 0.0
+		sounds.braking = command != null and command.brake > 0.1
+		sounds.weather = facts.get("weather", {})
 
 	if facts.is_empty():
 		_set_weather({"sky": DdWeather.CLEAR, "wind": false})
