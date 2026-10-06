@@ -34,6 +34,10 @@ const CHANNEL := "delivery.client"
 ## Hand the wheel to dot-vehicle's driver: what a screenshot of a moving truck uses.
 @export var autopilot: bool = false
 
+## A command to drive with instead of the keys, when set: what a headless client in a suite has
+## in place of a keyboard, and the seam a touch control would use.
+var command_override: DotVehicleCommand = null
+
 enum CameraMode { CHASE, CAB, HIGH }
 
 var game: DdGame = null
@@ -318,6 +322,9 @@ func _physics_process(delta: float) -> void:
 
 ## What the keys say, as a command. Idle in the garage, so a truck is not driven from a menu.
 func _sample(me: DdGame.Driver) -> DotVehicleCommand:
+	if command_override != null:
+		return command_override
+
 	var out := DotVehicleCommand.new()
 
 	if me == null or me.truck == null or garage.visible:
