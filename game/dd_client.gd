@@ -17,6 +17,7 @@ const DdTruck := preload("dd_truck.gd")
 const DdWeather := preload("dd_weather.gd")
 const DdNetBridge := preload("net/dd_net_bridge.gd")
 const DdTruckNet := preload("net/dd_truck_net.gd")
+const DdClientChat := preload("dd_client_chat.gd")
 
 ## Where dot-server's client publishes its link before the game scene loads. Present: this
 ## client is connected; absent: it is offline and owns its world.
@@ -53,6 +54,7 @@ var _sun: DirectionalLight3D = null
 var _env: Environment = null
 var _look := Vector3.ZERO
 
+var chat: DdClientChat = null
 var net: DotNetManager = null
 var bridge: DdNetBridge = null
 var link: Node = null
@@ -99,10 +101,17 @@ func _ready() -> void:
 	garage.act = _act
 	layer.add_child(garage)
 
+	chat = DdClientChat.new()
+	chat.name = "Chat"
+	add_child(chat)
+
 	if not _offline:
 		_show_garage(true)
 		DotLog.result(CHANNEL, "the netcode", _build_netcode())
+		DotLog.result(CHANNEL, "chat and voice", chat.attach(bridge))
 		return
+
+	DotLog.result(CHANNEL, "chat, offline", chat.attach(null))
 
 	game.stage_reached.connect(func(key: StringName, stage: int) -> void:
 		if key == local_key:
@@ -184,6 +193,10 @@ func _build_netcode() -> DotResult:
 			_show_garage(not on_road)
 
 		hud.show_solo(bool(view.get("solo", false))))
+	# Refusals and achievements are also kept in the chat box, where a player can read them back.
+	bridge.notice_received.connect(func(text: String) -> void:
+		if chat != null:
+			chat.notice(text))
 	bridge.said.connect(func(text: String, tone: String) -> void:
 		var colour: Color = {"good": Color(1.0, 0.85, 0.3), "bad": Color(1.0, 0.4, 0.35), "money": Color(0.55, 0.95, 0.5)}.get(tone, Color(1.0, 0.7, 0.4))
 
@@ -280,6 +293,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	if key == null or not key.pressed or key.echo:
 		return
 
+	if chat != null and chat.is_typing():
+		return
+
 	match key.keycode:
 		KEY_B:
 			_act("solo")
@@ -313,6 +329,11 @@ func _physics_process(delta: float) -> void:
 	if net == null or not net.is_running() or bridge == null:
 		return
 
+	# Not after the link has started closing: an input sent then is a WebSocket write on a closed
+	# socket, which the engine reports as an ERROR at the end of an otherwise clean disconnect.
+	if link != null and link.has_method("is_playing") and not bool(link.call("is_playing")):
+		return
+
 	var ticks := net.clock.advance(delta)
 
 	for i in range(ticks):
@@ -327,7 +348,8 @@ func _sample(me: DdGame.Driver) -> DotVehicleCommand:
 
 	var out := DotVehicleCommand.new()
 
-	if me == null or me.truck == null or garage.visible:
+	# Typing is not driving: W in a chat line must not floor the throttle.
+	if me == null or me.truck == null or garage.visible or (chat != null and chat.is_typing()):
 		out.brake = 1.0
 		return out
 

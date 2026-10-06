@@ -11,6 +11,9 @@ const CH_ALL := &"all"
 const CH_ADMIN := &"admin"
 const CH_WHISPER := &"whisper"
 
+## The longest line, here once: the client's box refuses past it rather than the server cutting it.
+const MAX_LINE := 160
+
 ## Voice from a truck reaches this far, for the proximity channel. Long, because a road is long
 ## and two trucks a bend apart are a conversation.
 const PROXIMITY_RANGE := 60.0
@@ -22,7 +25,7 @@ func _services_name() -> String:
 
 func _chat_rules() -> Object:
 	var rules := DotChatRules.new()
-	rules.max_length = 160
+	rules.max_length = MAX_LINE
 	rules.refuse_over_length = false
 	rules.allow_newlines = false
 	rules.escape_markup = true
@@ -62,6 +65,11 @@ func _chat_channels() -> Array:
 
 
 func _voice_config() -> Object:
+	return voice_format()
+
+
+## The voice format both ends must agree on exactly: the client's voice manager reads this too.
+static func voice_format() -> DotVoiceConfig:
 	var config := DotVoiceConfig.new()
 	config.sample_rate = 16000
 	config.frame_ms = 20.0

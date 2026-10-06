@@ -719,6 +719,17 @@ func receive_voice(peer_id: int, payload: PackedByteArray) -> DotResult:
 	return DotResult.success(true)
 
 
+## A client's microphone frame, up to the server.
+func send_voice_up(payload: PackedByteArray) -> void:
+	if link != null:
+		link.send_voice(1, payload)
+
+
+## A chat line from this client. The services judge it on the server.
+func ask_say(channel_id: StringName, text: String) -> void:
+	ask_act("say", {"channel": String(channel_id), "text": text})
+
+
 func send_voice(peer_id: int, payload: PackedByteArray) -> void:
 	if link != null:
 		link.send_voice(peer_id, payload)
