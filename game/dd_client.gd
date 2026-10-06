@@ -383,6 +383,17 @@ func _sample(me: DdGame.Driver) -> DotVehicleCommand:
 	return out
 
 
+## Another truck's engine, hung on it the first time it is drawn and fed every frame.
+func _feed_engine(other: DdGame.Driver, seen: bool, delta: float) -> void:
+	var engine := other.truck.get_node_or_null("Engine3D") as AudioStreamPlayer3D
+
+	if engine == null:
+		engine = DdSounds.engine_3d()
+		other.truck.add_child(engine)
+
+	DdSounds.feed_engine_3d(engine, _speed_of(other), seen and other.on_road(), delta)
+
+
 ## Forward speed: the body's own offline, the replicated one on a mirror (a frozen body has none).
 func _speed_of(me: DdGame.Driver) -> float:
 	if me == null or me.truck == null:
@@ -407,7 +418,11 @@ func _process(delta: float) -> void:
 		var other: DdGame.Driver = game.drivers[k]
 
 		if other.truck != null and is_instance_valid(other.truck):
-			(other.truck as Node3D).visible = game.sees(me, other)
+			var seen := game.sees(me, other)
+			(other.truck as Node3D).visible = seen
+
+			if other != me:
+				_feed_engine(other, seen, delta)
 
 	var facts := _trip_facts(me)
 	sounds.driving = not facts.is_empty()

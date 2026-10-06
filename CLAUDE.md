@@ -30,7 +30,7 @@ game/
   dd_module.gd     the DotGameModule: netcode numbers, cvars (dd_bots, dd_solo, dd_skip, dd_rocks, dd_collide), dd_status/dd_bank/dd_weather/dd_give, stand-ins, the bank's store
   dd_services.gd   chat (all, admin, whisper), push-to-talk voice, moderation, over dot-game's base
   dd_client_chat.gd  the chat box (Y) and push-to-talk (V); a truck idles while its driver types
-  dd_sounds.gd     synthesised: a diesel whose pitch follows speed, brake hiss, rain, wind, rock, the depot chime
+  dd_sounds.gd     synthesised: a diesel whose pitch follows speed, brake hiss, rain, wind, rock, the depot chime; a positional engine on every other truck (heard to 60 m, silent when that truck is hidden)
   dd_progress.gd   dot-stats numbers and achievements, reported to the backbone
   dd_server.gd     what scenes/dd_server.tscn runs: the world, drawing nothing
   dd_paths.gd      mount-aware paths (mg-deathrun's DrPaths)
@@ -105,5 +105,4 @@ In the order they are worth doing.
 
 1. **A browser look.** `examples/delivery_client` in dot-server-deploy proves the pack, the socket and the driving; nobody has driven it in the web shell. Then publish: the pack is `tmc/delivery` (`content/delivery/`), and the release order is the family's (addons tagged, shell, then the game).
 2. **A mountain behind the cliffs.** The drop is now a rock slope to the water with Kenney pines and rocks on it (MultiMeshes, drawn only, placed from a hash). A hillside above each cliff was built and taken out: made per segment it overlapped the road wherever the road turned toward it, drawn from both sides it was a dark slab across the sky, from one side its trees floated. It needs real terrain (a heightfield under the whole route), not ribbons.
-3. **Other trucks' engines**: `DdSounds` is the local truck's (engine pitch with speed, load with throttle, brake hiss, rain, wind, rock, the depot); a positional engine on each mirrored truck is not done.
-4. **The GitHub repository** (gamemann/mg-dangerous-delivery) is the owner's to create; the remote is set and nothing is pushed.
+3. **The GitHub repository** (gamemann/mg-dangerous-delivery) is the owner's to create; the remote is set and nothing is pushed.

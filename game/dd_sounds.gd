@@ -6,8 +6,9 @@ extends Node
 ##
 ## [b]Fed, never asking[/b], like the HUD: [DdClient] sets [member speed], [member throttle],
 ## [member braking] and [member weather] every frame and calls the one-shots when the world says
-## something happened. The engine of a truck you are not driving is not drawn here; it would be
-## a positional player on each mirrored truck, and is on the list.
+## something happened. Every OTHER truck carries its own positional engine ([method engine_3d],
+## hung on it by the client and fed its speed by [method feed_engine_3d]), so a truck coming up
+## behind you round a blind bend is heard before it is seen.
 
 const RATE := 22050
 
@@ -29,9 +30,15 @@ var _rumble: AudioStreamPlayer = null
 var _chime: AudioStreamPlayer = null
 var _was_braking := false
 
+## The engine loop, synthesised once: every truck's positional engine shares it.
+static var _engine_stream: AudioStreamWAV = null
+
 
 func _ready() -> void:
-	_engine = _player(_engine_loop(), true)
+	if _engine_stream == null:
+		_engine_stream = _engine_loop()
+
+	_engine = _player(_engine_stream, true)
 	_rain = _player(_noise_loop(0.9, 0.0), true)
 	_wind = _player(_noise_loop(0.15, 1.0), true)
 	_hiss = _player(_hiss_burst(), false)
@@ -65,6 +72,32 @@ func _process(delta: float) -> void:
 		_hiss.play()
 
 	_was_braking = braking
+
+
+## A positional engine for somebody else's truck. Heard from 60 m, full at 6: a diesel
+## carries further than a person's footsteps, and a truck is what is coming round the bend.
+static func engine_3d() -> AudioStreamPlayer3D:
+	if _engine_stream == null:
+		_engine_stream = _engine_loop()
+
+	var player := AudioStreamPlayer3D.new()
+	player.name = "Engine3D"
+	player.stream = _engine_stream
+	player.unit_size = 6.0
+	player.max_distance = 60.0
+	player.volume_db = -80.0
+	player.autoplay = true
+	return player
+
+
+## Feeds [param player] the truck's forward [param speed] (m/s) and whether it can be heard at
+## all ([param audible]: on the road and seen, since a truck you cannot see is solo or hidden).
+## No throttle is known for another truck, so load follows speed.
+static func feed_engine_3d(player: AudioStreamPlayer3D, speed_ms: float, audible: bool, delta: float) -> void:
+	var k := 1.0 - exp(-delta * 8.0)
+	var pace := clampf(absf(speed_ms) / 22.0, 0.0, 1.0)
+	player.pitch_scale = lerpf(player.pitch_scale, 0.55 + pace * 0.9, k)
+	player.volume_db = lerpf(player.volume_db, (-10.0 + 6.0 * pace) if audible else -80.0, k)
 
 
 func rock() -> void:
