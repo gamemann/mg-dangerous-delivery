@@ -1,0 +1,90 @@
+{
+	"format": 1,
+	"kind": "route",
+	"id": "dd_river_cut",
+	"name": "River Cut",
+	"author": "mg-dangerous-delivery",
+	"blurb": "Cut into the cliff over the river. No rails, and it rains here more often than not.",
+	"level": 2,
+	"pay": 380,
+	"width": 7.5,
+	"cargo": "crates",
+	"zones": {
+		"gorge": {
+			"name": "The Gorge",
+			"rain": 0.7,
+			"wind": 0.25
+		}
+	},
+	"segments": [
+		{
+			"length": 70.0,
+			"turn": 0.0,
+			"climb": 0.0,
+			"wall": "left",
+			"rail": "none"
+		},
+		{
+			"length": 140.0,
+			"turn": -35.0,
+			"climb": 10.0,
+			"wall": "left",
+			"rail": "none",
+			"zone": "gorge"
+		},
+		{
+			"length": 110.0,
+			"turn": 40.0,
+			"climb": 8.0,
+			"wall": "left",
+			"rail": "none",
+			"zone": "gorge",
+			"checkpoint": true,
+			"boulders": 1
+		},
+		{
+			"length": 160.0,
+			"turn": -20.0,
+			"climb": 14.0,
+			"wall": "left",
+			"rail": "none",
+			"zone": "gorge",
+			"width": 7.0
+		},
+		{
+			"length": 120.0,
+			"turn": 50.0,
+			"climb": 6.0,
+			"wall": "left",
+			"rail": "none",
+			"zone": "gorge",
+			"checkpoint": true,
+			"boulders": 2
+		},
+		{
+			"length": 140.0,
+			"turn": -45.0,
+			"climb": 12.0,
+			"wall": "left",
+			"rail": "none",
+			"zone": "gorge",
+			"width": 6.8
+		},
+		{
+			"length": 120.0,
+			"turn": 20.0,
+			"climb": 8.0,
+			"wall": "left",
+			"rail": "none",
+			"zone": "gorge",
+			"checkpoint": true
+		},
+		{
+			"length": 90.0,
+			"turn": 0.0,
+			"climb": 0.0,
+			"wall": "none",
+			"rail": "both"
+		}
+	]
+}

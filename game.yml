@@ -1,0 +1,11 @@
+# This game's descriptor. NOT YET LOADABLE BY A SERVER (2026-10-06): the game has no module,
+# no server scene and no bridge yet; it runs offline (`godot --path .`). See CLAUDE.md.
+
+content_id: gamemann/mg-dangerous-delivery
+version: 0.0.0
+kind: pack
+
+name: Dangerous Delivery
+max_players: 16
+
+client_scene: game/dd.tscn

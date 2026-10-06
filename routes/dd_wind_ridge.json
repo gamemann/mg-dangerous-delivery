@@ -1,0 +1,96 @@
+{
+	"format": 1,
+	"kind": "route",
+	"id": "dd_wind_ridge",
+	"name": "Wind Ridge",
+	"author": "mg-dangerous-delivery",
+	"blurb": "Along the top of a ridge with a drop on both sides, in a wind that comes in gusts.",
+	"level": 4,
+	"pay": 560,
+	"width": 6.8,
+	"cargo": "crates",
+	"zones": {
+		"ridge": {
+			"name": "The Ridge",
+			"wind": 0.9,
+			"rain": 0.3
+		},
+		"saddle": {
+			"name": "The Saddle",
+			"wind": 0.6,
+			"snow": 0.3
+		}
+	},
+	"segments": [
+		{
+			"length": 80.0,
+			"turn": 0.0,
+			"climb": 0.0,
+			"wall": "left",
+			"rail": "none"
+		},
+		{
+			"length": 140.0,
+			"turn": 15.0,
+			"climb": 14.0,
+			"wall": "left",
+			"rail": "none",
+			"zone": "saddle"
+		},
+		{
+			"length": 160.0,
+			"turn": -20.0,
+			"climb": 8.0,
+			"wall": "none",
+			"rail": "none",
+			"zone": "ridge",
+			"checkpoint": true,
+			"width": 6.5
+		},
+		{
+			"length": 140.0,
+			"turn": 30.0,
+			"climb": 4.0,
+			"wall": "none",
+			"rail": "none",
+			"zone": "ridge",
+			"width": 6.2
+		},
+		{
+			"length": 120.0,
+			"turn": -35.0,
+			"climb": -6.0,
+			"wall": "none",
+			"rail": "none",
+			"zone": "ridge",
+			"checkpoint": true,
+			"width": 6.2
+		},
+		{
+			"length": 150.0,
+			"turn": 25.0,
+			"climb": 10.0,
+			"wall": "right",
+			"rail": "none",
+			"zone": "saddle",
+			"boulders": 2
+		},
+		{
+			"length": 130.0,
+			"turn": -20.0,
+			"climb": 6.0,
+			"wall": "none",
+			"rail": "none",
+			"zone": "ridge",
+			"checkpoint": true,
+			"width": 6.0
+		},
+		{
+			"length": 90.0,
+			"turn": 0.0,
+			"climb": 0.0,
+			"wall": "none",
+			"rail": "both"
+		}
+	]
+}

@@ -1,0 +1,118 @@
+{
+	"format": 1,
+	"kind": "route",
+	"id": "dd_snowline",
+	"name": "Snowline Pass",
+	"author": "mg-dangerous-delivery",
+	"blurb": "Switchbacks up into the snow. Brake before the bend, not in it.",
+	"level": 3,
+	"pay": 480,
+	"width": 7.0,
+	"cargo": "crates",
+	"zones": {
+		"lower": {
+			"name": "Lower Pass",
+			"rain": 0.4
+		},
+		"upper": {
+			"name": "Snowline",
+			"snow": 0.8,
+			"wind": 0.3
+		}
+	},
+	"segments": [
+		{
+			"length": 80.0,
+			"turn": 0.0,
+			"climb": 0.0,
+			"wall": "left",
+			"rail": "none"
+		},
+		{
+			"length": 130.0,
+			"turn": 0.0,
+			"climb": 14.0,
+			"wall": "left",
+			"rail": "none",
+			"zone": "lower"
+		},
+		{
+			"length": 95.0,
+			"turn": -180.0,
+			"climb": 6.0,
+			"wall": "left",
+			"rail": "none",
+			"zone": "lower"
+		},
+		{
+			"length": 140.0,
+			"turn": 0.0,
+			"climb": 16.0,
+			"wall": "right",
+			"rail": "none",
+			"zone": "lower",
+			"checkpoint": true,
+			"boulders": 1
+		},
+		{
+			"length": 95.0,
+			"turn": 180.0,
+			"climb": 6.0,
+			"wall": "right",
+			"rail": "none",
+			"zone": "upper"
+		},
+		{
+			"length": 140.0,
+			"turn": 0.0,
+			"climb": 16.0,
+			"wall": "left",
+			"rail": "none",
+			"zone": "upper",
+			"boulders": 1
+		},
+		{
+			"length": 95.0,
+			"turn": -180.0,
+			"climb": 6.0,
+			"wall": "left",
+			"rail": "none",
+			"zone": "upper",
+			"width": 6.8
+		},
+		{
+			"length": 120.0,
+			"turn": 10.0,
+			"climb": 12.0,
+			"wall": "right",
+			"rail": "none",
+			"zone": "upper",
+			"checkpoint": true
+		},
+		{
+			"length": 150.0,
+			"turn": -30.0,
+			"climb": 6.0,
+			"wall": "right",
+			"rail": "none",
+			"zone": "upper",
+			"boulders": 1
+		},
+		{
+			"length": 100.0,
+			"turn": 20.0,
+			"climb": 0.0,
+			"wall": "none",
+			"rail": "none",
+			"zone": "upper",
+			"checkpoint": true
+		},
+		{
+			"length": 90.0,
+			"turn": 0.0,
+			"climb": -4.0,
+			"wall": "none",
+			"rail": "both"
+		}
+	]
+}

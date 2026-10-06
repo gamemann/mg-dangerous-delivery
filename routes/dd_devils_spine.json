@@ -1,0 +1,137 @@
+{
+	"format": 1,
+	"kind": "route",
+	"id": "dd_devils_spine",
+	"name": "Devil's Spine",
+	"author": "mg-dangerous-delivery",
+	"blurb": "Everything at once, and narrow. The pay is for the people who get there.",
+	"level": 5,
+	"pay": 700,
+	"width": 6.5,
+	"cargo": "crates",
+	"zones": {
+		"gate": {
+			"name": "The Gate",
+			"rain": 0.5,
+			"wind": 0.4
+		},
+		"spine": {
+			"name": "The Spine",
+			"snow": 0.7,
+			"wind": 0.7
+		},
+		"summit": {
+			"name": "Summit",
+			"snow": 0.9,
+			"wind": 0.5
+		}
+	},
+	"segments": [
+		{
+			"length": 70.0,
+			"turn": 0.0,
+			"climb": 0.0,
+			"wall": "left",
+			"rail": "none"
+		},
+		{
+			"length": 140.0,
+			"turn": -25.0,
+			"climb": 16.0,
+			"wall": "left",
+			"rail": "none",
+			"zone": "gate",
+			"boulders": 2
+		},
+		{
+			"length": 95.0,
+			"turn": 180.0,
+			"climb": 8.0,
+			"wall": "right",
+			"rail": "none",
+			"zone": "gate"
+		},
+		{
+			"length": 130.0,
+			"turn": 0.0,
+			"climb": 18.0,
+			"wall": "left",
+			"rail": "none",
+			"zone": "gate",
+			"checkpoint": true,
+			"boulders": 1
+		},
+		{
+			"length": 95.0,
+			"turn": -180.0,
+			"climb": 8.0,
+			"wall": "left",
+			"rail": "none",
+			"zone": "spine",
+			"width": 6.2
+		},
+		{
+			"length": 150.0,
+			"turn": 20.0,
+			"climb": 16.0,
+			"wall": "none",
+			"rail": "none",
+			"zone": "spine",
+			"width": 6.0
+		},
+		{
+			"length": 120.0,
+			"turn": -40.0,
+			"climb": 8.0,
+			"wall": "left",
+			"rail": "none",
+			"zone": "spine",
+			"checkpoint": true,
+			"boulders": 2
+		},
+		{
+			"length": 95.0,
+			"turn": 180.0,
+			"climb": 6.0,
+			"wall": "right",
+			"rail": "none",
+			"zone": "summit",
+			"width": 6.2
+		},
+		{
+			"length": 140.0,
+			"turn": -15.0,
+			"climb": 14.0,
+			"wall": "none",
+			"rail": "none",
+			"zone": "summit",
+			"boulders": 1,
+			"width": 5.8
+		},
+		{
+			"length": 110.0,
+			"turn": 35.0,
+			"climb": 6.0,
+			"wall": "right",
+			"rail": "none",
+			"zone": "summit",
+			"checkpoint": true
+		},
+		{
+			"length": 130.0,
+			"turn": -10.0,
+			"climb": 4.0,
+			"wall": "none",
+			"rail": "none",
+			"zone": "summit",
+			"width": 5.8
+		},
+		{
+			"length": 90.0,
+			"turn": 0.0,
+			"climb": 0.0,
+			"wall": "none",
+			"rail": "both"
+		}
+	]
+}

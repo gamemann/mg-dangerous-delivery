@@ -1,0 +1,86 @@
+{
+	"format": 1,
+	"kind": "route",
+	"id": "dd_foothills",
+	"name": "Foothills",
+	"author": "mg-dangerous-delivery",
+	"blurb": "A gentle climb with rails most of the way. Learn how the truck stops.",
+	"level": 1,
+	"pay": 300,
+	"width": 8.5,
+	"cargo": "crates",
+	"zones": {
+		"valley": {
+			"name": "The Valley",
+			"rain": 0.35,
+			"wind": 0.1
+		}
+	},
+	"segments": [
+		{
+			"length": 80.0,
+			"turn": 0.0,
+			"climb": 0.0,
+			"wall": "none",
+			"rail": "both"
+		},
+		{
+			"length": 120.0,
+			"turn": 25.0,
+			"climb": 6.0,
+			"wall": "left",
+			"rail": "right",
+			"zone": "valley"
+		},
+		{
+			"length": 100.0,
+			"turn": -30.0,
+			"climb": 8.0,
+			"wall": "left",
+			"rail": "right",
+			"zone": "valley",
+			"checkpoint": true
+		},
+		{
+			"length": 140.0,
+			"turn": 0.0,
+			"climb": 12.0,
+			"wall": "left",
+			"rail": "none",
+			"zone": "valley"
+		},
+		{
+			"length": 110.0,
+			"turn": 45.0,
+			"climb": 6.0,
+			"wall": "right",
+			"rail": "left",
+			"zone": "valley",
+			"checkpoint": true
+		},
+		{
+			"length": 120.0,
+			"turn": -20.0,
+			"climb": 10.0,
+			"wall": "left",
+			"rail": "none",
+			"zone": "valley",
+			"boulders": 1
+		},
+		{
+			"length": 90.0,
+			"turn": 30.0,
+			"climb": 4.0,
+			"wall": "left",
+			"rail": "none",
+			"checkpoint": true
+		},
+		{
+			"length": 100.0,
+			"turn": 0.0,
+			"climb": 2.0,
+			"wall": "none",
+			"rail": "both"
+		}
+	]
+}

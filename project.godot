@@ -1,0 +1,32 @@
+; Engine configuration file.
+; It's best edited using the editor UI and not directly,
+; since the parameters that go here are not all obvious.
+;
+; Format:
+;   [section] ; section goes between []
+;   param=value ; assign values to parameters
+
+config_version=5
+
+[application]
+
+config/name="mg-dangerous-delivery"
+config/description="Drive a loaded truck up mountain roads with no rails, through snow, rain, wind and falling rock, and deliver it. The harder the haul, the more it pays."
+config/features=PackedStringArray("4.7")
+run/main_scene="res://game/dd.tscn"
+
+[physics]
+
+; The engine default, and nothing reads it: DdConfig.gravity is what the world is tuned
+; against and DdGame writes it onto its own physics space, because a project setting does
+; not travel inside a delivered dot-cloud pack (mg-buses-from-hell's finding).
+3d/default_gravity=9.8
+; 60 ticks: a VehicleBody3D's raycast suspension is stable at 60 and visibly bouncy at 30.
+common/physics_ticks_per_second=60
+
+[rendering]
+
+; The renderer the delivered client runs: the client shell is gl_compatibility because the
+; browser is its target.
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
