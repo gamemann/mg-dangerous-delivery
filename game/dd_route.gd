@@ -17,9 +17,16 @@ extends Node3D
 const DdRouteDoc := preload("dd_route_doc.gd")
 const DdWeather := preload("dd_weather.gd")
 const DdPaths := preload("dd_paths.gd")
+const DdTerrain := preload("dd_terrain.gd")
 
-## How far out the drop's slope runs to the water. Drawn only: nothing stands on it.
+## The drop's slope: [constant SKIRT_DEPTH] down for every DROP_OUT across. Drawn only: nothing
+## stands on it.
 const DROP_OUT := 38.0
+
+## How far out the drop's rock is drawn as its own strip, from the road's edge. Past it the
+## mountain ([DdTerrain]) carries the same slope on to the water: drawn the full 38 m, the strip
+## ended in a lip 2.5 m over the terrain, shaded unlike it, all along every drop.
+const DROP_STRIP := 13.0
 
 const TREES := ["tree_pineTallA", "tree_pineDefaultA", "tree_pineRoundA", "tree_cone_dark", "tree_cone"]
 const ROCKS := ["rock_largeA", "rock_largeC", "rock_tallB", "rock_tallE", "stone_largeB"]
@@ -73,6 +80,10 @@ var debris: Array = []
 ## zone with one assignment.
 var zone_materials: Dictionary = {}
 
+## The mountain the route is cut into ([DdTerrain]); null on a server, which draws nothing.
+var terrain: DdTerrain = null
+var _terrain_node: MeshInstance3D = null
+
 var _body: StaticBody3D = null
 var _faces: PackedVector3Array = PackedVector3Array()
 var _lowest_y: float = 0.0
@@ -109,6 +120,8 @@ func clear() -> void:
 	ice = []
 	debris = []
 	zone_materials = {}
+	terrain = null
+	_terrain_node = null
 	_body = null
 	doc = {}
 
@@ -395,6 +408,9 @@ func _build_geometry() -> void:
 	_build_gate(length() - 1.0, "DEPOT")
 
 	if draws:
+		terrain = make_terrain()
+		_terrain_node = terrain.make_node(_noise(0.05, 0.6))
+		add_child(_terrain_node)
 		_build_scenery()
 	_build_ice()
 	_build_debris()
@@ -442,19 +458,28 @@ func _build_segment(index: int, from_i: int, to_i: int) -> void:
 		if wall == "right" or wall == "both":
 			_quad(rock, true, r0, r0 + up, r1 + up, r1, true)
 
+		# The cliff's top, running back to meet the mountain ([DdTerrain]): the ground is held
+		# under the road for a band behind the wall, and from above that band is a crevasse
+		# between the wall and the hillside. Drawn only, and only where something draws.
+		if draws:
+			if wall == "left" or wall == "both":
+				_cap(rock, i, l0 + up, l1 + up, -1.0, i == from_i, i + 1 == to_i)
+			if wall == "right" or wall == "both":
+				_cap(rock, i, r0 + up, r1 + up, 1.0, i == from_i, i + 1 == to_i)
+
 		# The drop's face: drawn below an open edge so the road reads as a ledge, and NOT
 		# collided — nothing stands on a cliff face, and a truck going over should fall.
-		var deep := Vector3(0.0, -SKIRT_DEPTH, 0.0)
+		var deep := Vector3(0.0, -SKIRT_DEPTH * DROP_STRIP / DROP_OUT, 0.0)
 
 		# The drop: a rock slope down to the water rather than a sheer sheet, so the road reads
 		# as cut into a mountainside and a truck going over has something to tumble down.
 		if wall != "left" and wall != "both":
-			var out0 := -right_of(yaws[i]) * DROP_OUT
-			var out1 := -right_of(yaws[i + 1]) * DROP_OUT
+			var out0 := -right_of(yaws[i]) * DROP_STRIP
+			var out1 := -right_of(yaws[i + 1]) * DROP_STRIP
 			_quad(rock, false, l0 + down, l0 + deep + out0, l1 + deep + out1, l1 + down, false)
 		if wall != "right" and wall != "both":
-			var out0 := right_of(yaws[i]) * DROP_OUT
-			var out1 := right_of(yaws[i + 1]) * DROP_OUT
+			var out0 := right_of(yaws[i]) * DROP_STRIP
+			var out1 := right_of(yaws[i + 1]) * DROP_STRIP
 			_quad(rock, false, r1 + down, r1 + deep + out1, r0 + deep + out0, r0 + down, false)
 
 		var rail_up := Vector3(0.0, RAIL_HEIGHT, 0.0)
@@ -483,6 +508,46 @@ func _build_segment(index: int, from_i: int, to_i: int) -> void:
 	add_child(rock_mesh)
 
 
+
+
+## A strip from the wall's top edge back [constant DdTerrain.CAP] metres, climbing, with a face
+## down from its far edge: where the mountain behind is lower than the strip (the last metres
+## of a wall, where the mountain tapers off) the face closes what would be a gap under it.
+func _cap(rock: SurfaceTool, i: int, e0: Vector3, e1: Vector3, side: float, first: bool, last: bool) -> void:
+	var back := Vector3(0.0, DdTerrain.CAP * DdTerrain.CAP_RISE, 0.0)
+	var o0 := e0 + right_of(yaws[i]) * side * DdTerrain.CAP + back
+	var o1 := e1 + right_of(yaws[i + 1]) * side * DdTerrain.CAP + back
+	var sink := Vector3(0.0, -WALL_HEIGHT - DdTerrain.CAP * DdTerrain.CAP_RISE, 0.0)
+	var foot := Vector3(0.0, -WALL_HEIGHT, 0.0)
+
+	if side < 0.0:
+		_quad(rock, false, o0, e0, e1, o1, false)
+		_quad(rock, false, o1, o1 + sink, o0 + sink, o0, false)
+	else:
+		_quad(rock, false, e0, o0, o1, e1, false)
+		_quad(rock, false, o0, o0 + sink, o1 + sink, o1, false)
+
+	# The ends, closed: where a wall stops, an open strip and face showed as a thin fin against
+	# the sky. A wall that carries on into the next segment closes against itself, unseen.
+	if first:
+		_quad(rock, false, e0 + foot, e0, o0, o0 + sink, false)
+	if last:
+		_quad(rock, false, e1 + foot, o1 + sink, o1, e1, false)
+
+
+## The heightfield under this route, from its samples alone: what [method build] draws, and
+## what a suite asks without drawing.
+func make_terrain() -> DdTerrain:
+	var made := DdTerrain.new()
+	var pads: Array = []
+
+	for is_lot: bool in [true, false]:
+		var at := transform_at(0.0 if is_lot else length(), 0.0)
+		var along := -PAD_SIZE.y * 0.5 + 2.0 if is_lot else PAD_SIZE.y * 0.5 - 2.0
+		pads.append({"centre": at.origin + at.basis * Vector3(0.0, 0.0, -along), "basis": at.basis})
+
+	made.compute(self, WALL_HEIGHT, SLAB, SKIRT_DEPTH / DROP_OUT, _lowest_y - SKIRT_DEPTH, pads, PAD_SIZE * 0.5)
+	return made
 
 
 ## The centre line, dashed: three metres on, three off, a hair above the surface.
@@ -584,6 +649,9 @@ func paint_zone(zone: String, snowy: bool, rainy: bool) -> void:
 	material.albedo_color = SNOW if snowy else (WET if rainy else ASPHALT)
 	material.roughness = 0.35 if rainy and not snowy else 0.9
 
+	if terrain != null:
+		terrain.paint(_terrain_node, zone, snowy, rainy)
+
 
 func _build_pad(at: Transform3D, is_lot: bool) -> void:
 	var pad := CSGBox3D.new()
@@ -660,14 +728,21 @@ func _build_scenery() -> void:
 			var edge: Vector3 = points[i] + out * width * 0.5
 
 			# On the drop only: pines growing out of the slope below the road, and rock further
-			# down. A mountainside above each cliff was tried and taken out: built per segment, it
-			# overlapped the road wherever the road turned toward it, drawn from both sides it
-			# was a dark slab across the sky, and drawn from one its trees floated.
+			# down. The mountain above each cliff grows its own (DdTerrain.scatter, below): a
+			# hillside built per segment was tried first and overlapped the road wherever the road
+			# turned toward it.
 			if cliff:
 				continue
 
 			var down := 4.0 + roll * 44.0
-			var at: Vector3 = edge + out * (down / SKIRT_DEPTH * DROP_OUT) + Vector3(0, -SLAB - down, 0)
+			var across := down / SKIRT_DEPTH * DROP_OUT
+			var at: Vector3 = edge + out * across + Vector3(0, -SLAB - down, 0)
+
+			# On whatever is there: the strip near the road, the mountain past it — 1 m under the
+			# strip's plane, so a pine put on the plane past the strip's end floated.
+			if terrain != null:
+				var ground := terrain.height_at(at.x, at.z)
+				at.y = (maxf(at.y, ground) if across <= DROP_STRIP else ground) - 0.4
 
 			if roll < 0.55:
 				_place(placements, TREES[int(roll * 997.0) % TREES.size()], at, roll * TAU, 3.4 + roll * 2.0)
@@ -675,6 +750,17 @@ func _build_scenery() -> void:
 				_place(placements, ROCKS[int(roll * 991.0) % ROCKS.size()], at, roll * TAU, 4.0 + roll * 6.0)
 
 		i += 4
+
+	# And the mountain's own: pines on the gentle ground, rock on the steep, each standing at
+	# the terrain's height where it is.
+	if terrain != null:
+		for spot: Dictionary in terrain.scatter():
+			var roll := float(spot["roll"])
+
+			if bool(spot["rock"]):
+				_place(placements, ROCKS[int(roll * 991.0) % ROCKS.size()], spot["at"], roll * TAU, 3.0 + roll * 5.0)
+			else:
+				_place(placements, TREES[int(roll * 997.0) % TREES.size()], spot["at"], roll * TAU, 4.0 + roll * 4.0)
 
 	for model: String in placements:
 		var mesh := _scenery_mesh(model)

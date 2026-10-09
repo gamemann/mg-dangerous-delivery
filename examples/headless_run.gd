@@ -16,9 +16,10 @@ const DdTruck := preload("res://game/dd_truck.gd")
 const DdBank := preload("res://game/dd_bank.gd")
 const DdTrip := preload("res://game/dd_trip.gd")
 const DdProgress := preload("res://game/dd_progress.gd")
+const DdTerrain := preload("res://game/dd_terrain.gd")
 
-const SECTIONS := 15
-const CHECKS := 84
+const SECTIONS := 16
+const CHECKS := 89
 
 var _passed := 0
 var _failed := 0
@@ -34,6 +35,7 @@ func _ready() -> void:
 	print("dangerous delivery, headless")
 	_test_documents()
 	_test_road()
+	_test_mountain()
 	_test_weather()
 	_test_trucks()
 	_test_bank()
@@ -133,6 +135,97 @@ func _test_road() -> void:
 		rocks += int(seg["boulders"])
 	_check(road.boulder_sites.size() == rocks, "every boulder the document asks for has a site", "%d" % road.boulder_sites.size())
 	road.queue_free()
+	_finished_section()
+
+
+## The mountain under every route ([DdTerrain]). Drawn only, so nothing a truck does can find
+## it poking through the road: these are the only things that can.
+func _test_mountain() -> void:
+	_section("the mountain")
+	var through: Array = []
+	var under_pads: Array = []
+	var cliffs := [0, 0]
+	var overhangs: Array = []
+	var crowded: Array = []
+	var same := true
+
+	for file in ["dd_foothills", "dd_river_cut", "dd_snowline", "dd_wind_ridge", "dd_devils_spine"]:
+		var doc: Dictionary = DdRouteDoc.normalise(JSON.parse_string(FileAccess.get_file_as_string("res://routes/%s.json" % file))).value
+		var road := DdRoute.new()
+		road.draws = false
+		add_child(road)
+		var _b := road.build(doc)
+		var ground := road.make_terrain()
+		var segments: Array = doc["segments"]
+
+		for i in road.points.size() - 1:
+			var seg: Dictionary = segments[road.segment_of[i]]
+			var half := float(seg["width"]) * 0.5
+			var p := road.points[i]
+			var right := DdRoute.right_of(road.yaws[i])
+			var forward := DdRoute.forward_of(road.yaws[i])
+			var slab_bottom := p.y - absf(tan(deg_to_rad(float(seg["bank"])))) * half - DdRoute.SLAB
+
+			# Across the whole road and half a metre past each edge, twice between samples: the
+			# drawn surface is what is asked, triangles and all, not the grid's vertices.
+			for along: float in [0.0, 1.0]:
+				var lateral := -half - 0.5
+				while lateral <= half + 0.5:
+					var at := p + right * lateral + forward * along
+					var h := ground.height_at(at.x, at.z)
+					if h > slab_bottom:
+						through.append("%s @%.0f m lateral %.1f: ground %.2f over %.2f" % [file, road.distances[i], lateral, h, slab_bottom])
+					lateral += 0.5
+
+			# Behind the middle of a long wall the mountain stands higher than the wall's top,
+			# so the top of the cliff meets ground rather than sky.
+			var wall := str(seg["wall"])
+			var lo := maxi(i - 12, 0)
+			var hi := mini(i + 12, road.points.size() - 1)
+			if road.segment_of[lo] == road.segment_of[i] and road.segment_of[hi] == road.segment_of[i]:
+				for side: float in [-1.0, 1.0]:
+					if wall == "both" or (wall == "left" and side < 0.0) or (wall == "right" and side > 0.0):
+						var behind := p + right * side * (half + DdTerrain.CAP + 4.0)
+						cliffs[0] += 1
+						if ground.height_at(behind.x, behind.z) >= p.y + DdRoute.WALL_HEIGHT:
+							cliffs[1] += 1
+
+						# The cliff's top runs back CAP metres: none of it over any road.
+						var back := 1.0
+						while back <= DdTerrain.CAP:
+							var cap := p + right * side * (half + back)
+							var j := ground.sample_near(cap.x, cap.z)
+							var flat := Vector2(cap.x - road.points[j].x, cap.z - road.points[j].z).length()
+							var jhalf := float(segments[road.segment_of[j]]["width"]) * 0.5
+							if flat < jhalf + 0.5:
+								overhangs.append("%s @%.0f m over the road at %.0f m" % [file, road.distances[i], road.distances[j]])
+							back += 3.0
+
+		for pad: Transform3D in [road.transform_at(0.0, 0.0), road.transform_at(road.length(), 0.0)]:
+			var far := -1.0 if pad == road.transform_at(0.0, 0.0) else 1.0
+			for x in range(-16, 17, 4):
+				for z in range(0, 41, 4):
+					var at := pad.origin + pad.basis.x * float(x) + pad.basis.z * (-far * float(z))
+					if ground.height_at(at.x, at.z) > pad.origin.y - DdRoute.SLAB:
+						under_pads.append("%s pad at %s" % [file, at])
+
+		for spot: Dictionary in ground.scatter():
+			var at: Vector3 = spot["at"]
+			var j := ground.sample_near(at.x, at.z)
+			var flat := Vector2(at.x - road.points[j].x, at.z - road.points[j].z).length()
+			if flat < float(segments[road.segment_of[j]]["width"]) * 0.5 + DdTerrain.BAND:
+				crowded.append("%s %s by the road at %.0f m" % [file, at, road.distances[j]])
+
+		if file == "dd_snowline":
+			same = road.make_terrain().heights == ground.heights
+
+		road.free()
+
+	_check(through.is_empty(), "the mountain never rises through a road, on any route", "%d: %s" % [through.size(), ", ".join(through.slice(0, 3))])
+	_check(under_pads.is_empty(), "nor through the lot or the depot", "%d: %s" % [under_pads.size(), ", ".join(under_pads.slice(0, 3))])
+	_check(cliffs[0] > 50 and cliffs[1] >= cliffs[0] * 9 / 10, "behind nine cliffs in ten it stands above the wall's top", "%d of %d" % [cliffs[1], cliffs[0]])
+	_check(overhangs.is_empty(), "and no cliff's top hangs over another stretch of road", "%d: %s" % [overhangs.size(), ", ".join(overhangs.slice(0, 3))])
+	_check(crowded.is_empty() and same, "its trees keep off the road, and every machine raises the same mountain", "%d: %s" % [crowded.size(), ", ".join(crowded.slice(0, 3))])
 	_finished_section()
 
 

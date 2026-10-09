@@ -16,7 +16,8 @@ Every other game in the family puts a person on foot. This one has nobody walkin
 game/
   dd_config.gd     every rule, as a DotConfig (DD_*, --dd-*). Every gameplay number is here
   dd_route_doc.gd  what a route IS: segments (length, turn, climb, wall, rail, zone, checkpoint, boulders); validated
-  dd_route.gd      a document built: sampled every 2 m, the road/slab/cliff/skirt meshes, one trimesh, gates, pads; every query
+  dd_route.gd      a document built: sampled every 2 m, the road/slab/cliff/cliff-top/drop-strip meshes, one trimesh, gates, pads; every query
+  dd_terrain.gd    the mountain under a route: one heightfield from the samples, held under the road by a band; drawn only, per-zone snow
   dd_weather.gd    the sky over a zone as a pure function of (seed, zone, tick); gusts; grip
   dd_trucks.gd     the catalogue and the upgrades, as data; tunables_for() is what a truck drives with
   dd_truck.gd      a VehicleBody3D built from a Kenney model: hull from its bounds, wheels from its wheel nodes
@@ -38,7 +39,7 @@ game/
 routes/            five routes, written by tools/build_routes.py
 assets/kenney/trucks/  four Car Kit trucks and their atlas, CC0
 scenes/            dd_server.tscn
-examples/          headless_run (15 sections, 84 checks), headless_net (10, 33), dedicated (6, 19)
+examples/          headless_run (16 sections, 89 checks), headless_net (10, 33), dedicated (6, 19)
 tools/             build_routes.py; drive.sh/.gd (a stand-in delivers every route); shot.sh/.gd (render)
 ```
 
@@ -83,13 +84,29 @@ Nothing is predicted (dot-vehicle's decision for rigid bodies), so the bridge is
 - **Two stand-ins put on one start line jammed** at full throttle (2 m in 4 s, found by `dedicated`): their ghost time ran out while they still overlapped. A ghost now lasts until it is clear of every other truck.
 - **A scene with a parse error hangs** (the family's rule): `tools/drive.gd` with `:=` on an untyped receiver ran until its timeout.
 
+## Decision 6: the mountain is a heightfield held under the road by a band
+
+`DdTerrain` (2026-10-08) is one grid per route (5 m cells, 110 m past the road, ~20k vertices, ~0.25 s to build), computed from the samples alone, so every client raises the same mountain and a server raises none (`draws`; nothing collides with it, and the road's trimesh stays the only thing a truck stands on). Each vertex finds its nearest sample by two chamfer sweeps, and the nearest sample on another stretch of road (more than 40 samples away) by two more; it asks each what it wants (cliff side: the wall top plus a ridge that climbs 55 m and comes down past 45 m; drop side: the drop's slope, 1 m under the drop strip, to the water) and blends the two by inverse distance cubed. Then three blurs, hashed value noise (`DdWeather.unit`, never `hash()`) away from the road, a fall to the water at the grid's edge, a bank under the lot and the depot, and **last, the band**: every vertex within `BAND` (8 m) of any sample's road edge, or of a pad, is held under that slab. 8 m is more than a cell's diagonal, so a triangle with any vertex outside the band has no point over the road — which is the whole argument, and `headless_run`'s "the mountain" asks it of the drawn triangles (`height_at`) at every half metre across every road on every route.
+
+The band leaves a trench behind each wall, so the wall gets a **cliff top** (`DdRoute._cap`): a strip from its top edge 13 m back, climbing, with a face down its far side and closed ends; the mountain rises through it. The drop's rock strip now runs 13 m out (`DROP_STRIP`) and the terrain carries the same slope on. Snow is a shader: per-vertex zones blended over 40 m of road, `paint_zone` sets each zone's snow and wet, and ground above 112 m keeps its snow. Pines and rocks on the mountain are one hashed candidate per 3x3 cells, standing at `height_at` of their own spot; the drop's pines stand on whichever of strip and terrain is there.
+
+What rendering found, in order (`tools/shot.sh`, none of it visible to a suite):
+
+- **The mountain ran on behind the lot** to the grid's edge and stood there as a block with a dark cliff face; it now gives way over 45 m past either end of the road.
+- **Every route stood in the lake on a 60 m cliff of its own** at an 80 m margin; at 110 m (neighbours' grids may overlap, never reaching another road) and a 60 m fall it reads as a massif.
+- **The lot and the depot floated** at the shore once the mountain gave way there: hence the banks.
+- **A cliff top's open end** was a thin fin against the sky.
+- **The mountain began 20 m before its wall**, on the drop side, when the wall was dilated before smoothing: a hillside with no collision under it, which a truck going over would have fallen through. The taper is now inside the wall's own stretch (eroded, then smoothed).
+- **The 38 m drop strip ended in a lip** 2.5 m over the terrain, shaded unlike it; it is 13 m now, with the terrain 1 m under its plane. (A dark arch beside Devil's Spine's depot, seen from above, outlived that change: it is the massif's edge steepening into the lake, 50 m from the road, and was left.)
+- **Casting shadows, the mountain cost a fifth of a software-rendered frame** (a 10 s drive render: 56 s against 46 s without it); off, 47 s.
+
 ## Validating
 
 ```bash
 godot --headless --path . --import
 find . -name '*.gd' -not -path './.godot/*' -not -path './addons/*' | while read f; do
     godot --headless --path . --check-only --script "res://${f#./}"; done
-godot --headless --path . res://examples/headless_run.tscn   # 15 sections, 84 checks, ~35 s
+godot --headless --path . res://examples/headless_run.tscn   # 16 sections, 89 checks, ~35 s
 godot --headless --path . res://examples/headless_net.tscn   # 10 sections, 33 checks: server and client over loopback
 godot --headless --path . res://examples/dedicated.tscn      # 6 sections, 19 checks: a real DotServer and the module by path
 tools/build_routes.py --check
@@ -97,12 +114,12 @@ tools/drive.sh                     # every route delivered by a stand-in; TRUCK=
 tools/shot.sh; tools/shot.sh --view=drive --route=dd_snowline --sky=snow --seconds=45
 ```
 
-Each suite's check total was armed by being wrong once (headless_run 74/72, headless_net 31/30, dedicated 20/19; all fired).
+Each suite's check total was armed by being wrong once (headless_run 74/72, headless_net 31/30, dedicated 20/19; all fired; headless_run again at 89/88 when "the mountain" was added, and its road check by narrowing `DdTerrain.BAND` to 2 m, which put ground through 8772 points of road).
 
 ## Still to do
 
 In the order they are worth doing.
 
 1. **A browser look.** `examples/delivery_client` in dot-server-deploy proves the pack, the socket and the driving; nobody has driven it in the web shell. Then publish: the pack is `tmc/delivery` (`content/delivery/`), and the release order is the family's (addons tagged, shell, then the game).
-2. **A mountain behind the cliffs.** The drop is now a rock slope to the water with Kenney pines and rocks on it (MultiMeshes, drawn only, placed from a hash). A hillside above each cliff was built and taken out: made per segment it overlapped the road wherever the road turned toward it, drawn from both sides it was a dark slab across the sky, from one side its trees floated. It needs real terrain (a heightfield under the whole route), not ribbons.
+2. **The mountain, further.** Built (Decision 6). Left: from above each route is still its own island in the lake, with the massif's edge a steep face down to the water; one terrain under the whole world would join them, at the cost of the per-route build. The build is ~1.3 s for five routes on this machine and has not been timed in a browser. Grid lines on the steepest faces show at 5 m cells.
 3. **The GitHub repository** (gamemann/mg-dangerous-delivery) is the owner's to create; the remote is set and nothing is pushed.

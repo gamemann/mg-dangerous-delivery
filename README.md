@@ -12,7 +12,7 @@ I intend on reviewing code, testing, and editing documentation regularly. If you
 ## How it plays
 You start in the lot with a box truck and no money. Pick a route, set off, and get the load to the depot at the far end. Every route is a level, and the next level opens once you have delivered on the one below it. Routes are split into stages by checkpoints. Go over the edge and you are put back at the last checkpoint, with some of the load gone.
 
-**The weather belongs to the mountain.** Each route is split into zones, and every couple of minutes each zone rolls its own sky: snow (the road turns white and grip drops to 40%), rain (70% grip), or gusts of wind that push the truck toward the edge. Everybody in a zone gets the same weather. There is also rock falling off the cliffs, black ice, and fallen rock blocking a lane.
+**The weather belongs to the mountain.** Each route is split into zones, and every couple of minutes each zone rolls its own sky: snow (the road turns white and grip drops to 40%), rain (70% grip), or gusts of wind that push the truck toward the edge. Everybody in a zone gets the same weather. There is also rock falling off the cliffs, black ice, and fallen rock blocking a lane. Each route is cut into a mountain of its own, which climbs behind the cliffs and falls away to a lake under the drop, and the snow lies on it wherever it is snowing on the road.
 
 **Pay** starts from the route's pay, goes up with its level and with the truck you drive (harder trucks pay more), and goes up again for every kind of bad weather and every rockfall you actually drove through. It is scaled by how much of the load arrived, with a bonus for a run with no falls and no skips. The HUD shows what the trip pays right now.
 
