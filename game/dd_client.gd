@@ -64,6 +64,12 @@ var settings: DdSettings = null
 var net: DotNetManager = null
 var bridge: DdNetBridge = null
 var link: Node = null
+
+## The Tab board, the menu's. See [method _wire_board].
+var board: DotMenuScoreboard = null
+
+## When this client started, for an offline board's "time".
+var _started_msec: int = Time.get_ticks_msec()
 var _offline: bool = true
 
 
@@ -323,12 +329,17 @@ func _build_settings() -> void:
 	if garage != null:
 		garage.settings_requested.connect(settings.open)
 
-	if settings.stack != null and garage != null:
-		# [b]The lot steps aside while the settings are up.[/b] dot-ui's panel is translucent,
-		# which reads well over a road and not at all over the lot's three columns of text:
-		# the first render had the route list printed through the Apply button.
+	if settings.menu != null:
+		# Escape is the garage's; the menu still closes on it.
+		settings.menu.open_on_escape = false
+		settings.menu.busy = func() -> bool: return chat != null and chat.is_typing()
+
+	if settings.menu != null and garage != null:
+		# [b]The lot steps aside while the settings are up.[/b] The menu's panel sits over the
+		# lot's three columns of text, and the first render of the old one had the route list
+		# printed through the Apply button.
 		var lot_was_up := [false]
-		settings.stack.menu_state_changed.connect(func(any_open: bool) -> void:
+		settings.menu_state_changed.connect(func(any_open: bool) -> void:
 			if any_open:
 				lot_was_up[0] = garage.visible
 				garage.visible = false
@@ -336,11 +347,70 @@ func _build_settings() -> void:
 				garage.visible = true
 		)
 
+	_wire_board()
+
+
+## The Tab board: who is driving, in what, with how much money and how many deliveries, how
+## long they have been on and their ping. Money and deliveries are the server's bank, so
+## online the columns come from [DdModule]'s `_game_board_fields`; offline the bank is this
+## client's own.
+func _wire_board() -> void:
+	if settings == null or settings.menu == null:
+		return
+	board = settings.menu.scoreboard
+	board.title_text = "Dangerous Delivery"
+	board.columns = [
+		{"key": &"name", "title": "Driver", "width": 3.0},
+		{"key": &"truck", "title": "Truck", "width": 1.6},
+		{"key": &"money", "title": "Money", "kind": DotMenuScoreboard.KIND_NUMBER,
+			"format": func(v: Variant, _row: Dictionary) -> String: return "$%d" % int(v) if v != null else "-"},
+		{"key": &"deliveries", "title": "Deliveries", "kind": DotMenuScoreboard.KIND_NUMBER},
+		{"key": &"seconds", "title": "Time", "kind": DotMenuScoreboard.KIND_DURATION},
+		{"key": &"ping", "title": "Ping", "kind": DotMenuScoreboard.KIND_PING},
+	]
+	board.sort_by = &"money"
+	if not _offline and link != null and link.has_signal(&"scoreboard_received"):
+		board.feed_from(link)
+	else:
+		board.source = board_snapshot
+
+
+func _show_board(on: bool) -> void:
+	if board == null:
+		return
+	if on:
+		board.open()
+	else:
+		board.close()
+
+
+## The board from this client's own world. Public so a suite can read it.
+func board_snapshot() -> Dictionary:
+	var rows: Array = []
+	if game != null:
+		for key: StringName in game.drivers:
+			var driver = game.drivers[key]
+			var acct: Dictionary = game.bank.account(key) if game.bank != null else {}
+			var truck := game.trucks.get_truck(StringName(str(acct.get("truck", "")))) if game.trucks != null else {}
+			rows.append({
+				"id": String(key), "name": driver.name, "bot": driver.is_bot,
+				"truck": str(truck.get("name", acct.get("truck", ""))),
+				"money": int(acct.get("money", 0)), "deliveries": int(acct.get("deliveries", 0)),
+				"seconds": int((Time.get_ticks_msec() - _started_msec) / 1000) if not driver.is_bot else -1,
+				"ping": -1, "you": not driver.is_bot,
+			})
+	return {"server": {"name": "Dangerous Delivery", "game": "offline"}, "players": rows}
+
 
 # --- Controls ----------------------------------------------------------------
 
 func _unhandled_input(event: InputEvent) -> void:
 	var key := event as InputEventKey
+
+	# The Tab board, held: shown while the key is down, released when it comes up.
+	if key != null and key.physical_keycode == KEY_TAB and not key.echo:
+		_show_board(key.pressed)
+		return
 
 	if key == null or not key.pressed or key.echo:
 		return

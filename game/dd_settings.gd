@@ -1,174 +1,70 @@
-extends Node
+extends DotMenuSettings
 
-## A player's own settings: how wide the view is, how loud the game is.
+## A player's own settings and the menu that changes them: how wide the view is, how loud the
+## game is, the window, and the look of the menu itself. The lot's SETTINGS button and O open
+## it; Escape is the garage's.
 ##
-## [b]mg-buses-from-hell's `BfhSettings`, cut down to what mg-dangerous-delivery has[/b] (2026-10-08). That
-## file binds dot-audio's mixer; this game plays its sounds through its own players on the
-## engine's Master bus, so the volume is that bus's and there is one of it, because there is
-## nothing to split a voice or an effects slider from. The rest of the reasoning is that
-## file's and still true: `apply_all()` after load (a value read from disk has not CHANGED,
-## and a game that only listens for changes ignores every saved setting), `sensitivity` is
-## ACCOUNT under the family's `tmc_account` at its 0.022 degrees per unit, and
-## `field_of_view` is SERVER_CLAMPED, a bound a server may set and never read.
+## [codeblock]
+## var settings := DdSettings.new()
+## add_child(settings)
+## settings.setup()                    # loads, and pushes every value at what reads it
+## settings.bind_look(sampler.tunables)
+## settings.bind_camera(camera)
+## settings.bind_audio(audio.manager)
+## settings.open()                     # Escape does this in the client
+## [/codeblock]
 ##
-## [b]No sensitivity, though every other game has one.[/b] A player here is their truck: the
-## mouse turns nothing, the camera follows the cab, and a setting nobody reads is a slider
-## that does nothing — the thing `BfhSettings`' own note says every setting must not be.
-
-const CHANNEL := "dd.settings"
+## [b]dot-menu's `DotMenuSettings` with this game's schema[/b] (2026-10-09). It was a 250-line
+## copy of mg-buses-from-hell's file — a manager, a `match` over four keys and a bare settings
+## screen — and the same copy was in five other games. What is left here is what is this
+## game's: where the document lives, and the stock keys it has nothing to apply to.
+##
+## [b]The scopes are the family's, not this game's.[/b] `sensitivity` is ACCOUNT under the
+## shared `tmc_account` namespace — a person's hand, the same number in every game here.
+## `field_of_view` is SERVER_CLAMPED: a wide view is an advantage a server may cap, and
+## dot-settings gives a server no way to READ it. The volumes are this machine's.
 
 const SCHEMA_VERSION := 1
 
+## Where this game's own document lives. The shared account document is dot-settings'.
 const SETTINGS_DIR := "user://delivery_settings"
 
+## The app's namespace. ACCOUNT settings are shared under dot-menu's `tmc_account`.
 const APP_NAMESPACE := &"dangerous_delivery"
-const SHARED_NAMESPACE := &"tmc_account"
 
 ## The field of view the camera had before this existed, and still the default.
 const DEFAULT_FOV := 70
 
-var settings: DotSettingsManager = null
+## Stock keys nothing here applies: every sound is on the Master bus, nobody turns a view with
+## the mouse (a player is their truck), the client binds no effects, and the chat box has no
+## switch.
+const NOT_APPLIED: Array[StringName] = [
+	&"sfx_volume", &"ui_volume", &"voice_volume", &"sensitivity", &"invert_mouse",
+	&"shake_scale", &"allow_flashes", &"fx_quality", &"chat_window",
+]
 
-## The menu the screen lives in. Null when built without a screen.
-var stack: DotScreenStack = null
-var screen: DotSettingsScreen = null
 
-var _layer: CanvasLayer = null
-var _camera: Camera3D = null
+func _init() -> void:
+	name = "Settings"
+	directory = SETTINGS_DIR
+	app_namespace = APP_NAMESPACE
+	schema = schema_for()
+	config = DotMenuConfig.new()
+	config.brand_name = "Dangerous Delivery"
+	# Nothing to leave to and no keys table to help with; Escape and Resume close the menu.
+	config.show_help = false
+	config.show_leave = false
+	# Escape is the garage; O and the lot's button open this.
+	config.open_on_pointer_release = false
+	var _layered := config.load_layered()
 
 
-static func schema() -> DotSettingsSchema:
+## The document: this game's field of view first, so it keeps its own default, then the
+## stock settings it applies.
+static func schema_for() -> DotSettingsSchema:
 	var s := DotSettingsSchema.new()
 	s.version = SCHEMA_VERSION
-
 	s.add(DotSettingsDef.integer(&"field_of_view", DEFAULT_FOV, 60, 120, &"video").with_scope(
 		DotSettingsDef.Scope.SERVER_CLAMPED
 	))
-
-	s.add(DotSettingsDef.number(&"master_volume", 0.8, 0.0, 1.0, &"audio"))
-	return s
-
-
-## Loads the document and builds the screen. [param store] replaces the file store, which
-## is what a suite does; [param with_screen] false builds the document alone.
-func setup(store: DotSettingsStore = null, with_screen: bool = true) -> DotResult:
-	settings = DotSettingsManager.new()
-	settings.name = "Manager"
-	settings.schema = schema()
-	settings.local_store = store if store != null else DotSettingsStoreFile.new(SETTINGS_DIR)
-	settings.app_namespace = APP_NAMESPACE
-	settings.shared_namespace = SHARED_NAMESPACE
-	settings.register_as_service = false
-	add_child(settings)
-
-	var loaded := settings.setup()
-	if not loaded.ok:
-		return loaded.wrap("the player's settings")
-
-	settings.changed.connect(_on_changed)
-
-	if with_screen:
-		var built := _build_screen()
-		if not built.ok:
-			DotLog.warn(CHANNEL, "no settings screen", {"why": built.error.message})
-
-	apply_all()
-	return DotResult.success(self)
-
-
-func _build_screen() -> DotResult:
-	_layer = CanvasLayer.new()
-	_layer.name = "MenuLayer"
-	# Over the HUD and the chat box: a menu under the chat has a line of text across Apply.
-	_layer.layer = 110
-	add_child(_layer)
-
-	stack = DotScreenStack.new()
-	stack.name = "Menus"
-	stack.register_service = false
-	# The client owns the pointer; a browser only captures on a click.
-	stack.manage_mouse = false
-	var config := DotUiConfig.new()
-	# Never paused: the server does not stop for one player's volume.
-	config.allow_pause = false
-	stack.config = config
-	_layer.add_child(stack)
-
-	var stacked := stack.setup()
-	if not stacked.ok:
-		return stacked
-
-	screen = DotSettingsScreen.new()
-	screen.name = "Settings"
-	screen.title_text = "Settings"
-	screen.half_size = Vector2(280.0, 140.0)
-	var built := screen.build(settings)
-	if not built.ok:
-		screen.free()
-		screen = null
-		return built
-
-	return stack.register(screen)
-
-
-## Pushes every current value at whatever reads it. See the class note.
-func apply_all() -> void:
-	if settings == null:
-		return
-
-	for key in settings.schema.keys():
-		_on_changed(key, settings.get_value(key), &"applied")
-
-
-func bind_camera(camera: Camera3D) -> void:
-	_camera = camera
-	_apply_fov()
-
-
-func _on_changed(key: StringName, _value: Variant, _why: StringName) -> void:
-	match key:
-		&"field_of_view":
-			_apply_fov()
-		&"master_volume":
-			_apply_volume()
-
-
-func _apply_fov() -> void:
-	if _camera != null and settings != null:
-		_camera.fov = float(settings.get_int(&"field_of_view", DEFAULT_FOV))
-
-
-## The engine's Master bus, which every sound in this game goes through. A silent setting
-## is a bus muted rather than at minus infinity decibels, which some drivers click on.
-func _apply_volume() -> void:
-	if settings == null:
-		return
-
-	var bus := AudioServer.get_bus_index(&"Master")
-	if bus < 0:
-		return
-
-	var level := clampf(settings.get_float(&"master_volume", 0.8), 0.0, 1.0)
-	AudioServer.set_bus_mute(bus, level <= 0.0001)
-	AudioServer.set_bus_volume_db(bus, linear_to_db(maxf(level, 0.0001)))
-
-
-func is_open() -> bool:
-	return stack != null and stack.any_open()
-
-
-func open() -> void:
-	if stack != null and screen != null and not stack.is_open(screen.screen_id()):
-		var _pushed := stack.push(screen.screen_id())
-
-
-func close() -> void:
-	if stack != null and screen != null and stack.is_open(screen.screen_id()):
-		var _popped := stack.pop(screen.screen_id())
-
-
-func describe() -> Dictionary:
-	var out := settings.describe() if settings != null else {}
-	out["open"] = is_open()
-	out["camera_bound"] = _camera != null
-	return out
+	return DotMenuStock.declare(s, DotMenuStock.DEFAULT_GROUPS, null, NOT_APPLIED)

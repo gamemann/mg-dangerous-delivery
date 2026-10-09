@@ -79,6 +79,24 @@ func _make_identity() -> Node:
 	return DotPlatformIdentity.new()
 
 
+## The Tab board's columns, from the bank, which only the server has: money, deliveries and
+## the truck. Keyed the way the bridge keys a driver (see [method _make_bridge]).
+func _game_board_fields(session: Object) -> Dictionary:
+	var world := game as DdGame
+	var uid := str(session.call("uid")) if session != null and session.has_method("uid") else ""
+	if world == null or uid == "":
+		return {}
+	var key := StringName("uid:%s" % uid)
+	if not world.drivers.has(key):
+		return {}
+	var acct := world.bank.account(key)
+	var truck := world.trucks.get_truck(StringName(str(acct.get("truck", ""))))
+	return {
+		"money": int(acct.get("money", 0)), "deliveries": int(acct.get("deliveries", 0)),
+		"truck": str(truck.get("name", acct.get("truck", ""))),
+	}
+
+
 func _game_load() -> DotResult:
 	var world := game as DdGame
 

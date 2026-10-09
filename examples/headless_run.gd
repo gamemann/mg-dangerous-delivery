@@ -19,7 +19,7 @@ const DdProgress := preload("res://game/dd_progress.gd")
 const DdTerrain := preload("res://game/dd_terrain.gd")
 
 const SECTIONS := 17
-const CHECKS := 91
+const CHECKS := 94
 
 var _passed := 0
 var _failed := 0
@@ -594,6 +594,30 @@ func _test_the_client_settings() -> void:
 	if button != null:
 		button.pressed.emit()
 	_check(button != null and settings != null and settings.is_open(), "and the lot's SETTINGS button opens them")
+	settings.close()
+
+	# Escape is the garage's here: it must not open the menu, and the menu must still close.
+	var escape := InputEventKey.new()
+	escape.physical_keycode = KEY_ESCAPE
+	escape.keycode = KEY_ESCAPE
+	escape.pressed = true
+	var menu: DotMenu = settings.menu
+	_check(menu != null and not menu.handle_event(escape) and not settings.is_open(),
+		"Escape with the menu shut is left to the garage")
+
+	# The Tab board, held: the menu's, drawn from the local bank offline.
+	var tab := InputEventKey.new()
+	tab.physical_keycode = KEY_TAB
+	tab.pressed = true
+	client.call("_unhandled_input", tab)
+	var board: DotMenuScoreboard = client.get("board")
+	_check(board != null and board.is_open() and board.rows().any(func(r: Dictionary) -> bool:
+			return bool(r.get("you", false)) and r.has("money") and str(r.get("truck", "")) != ""),
+		"Tab holds the board up: this driver, their truck and their money",
+		str(board.rows()) if board != null else "no board")
+	tab.pressed = false
+	client.call("_unhandled_input", tab)
+	_check(board != null and not board.is_open(), "and letting go puts it away")
 
 	remove_child(client)
 	client.free()
