@@ -105,6 +105,16 @@ func _game_load() -> DotResult:
 
 	world.bank.store = DdBank.SqlStore.new(bank_driver) if bank_driver != null else DdBank.JsonStore.new(bank_file)
 
+	# Routes from the map packs the server names (its cfg/content.yml), beside the game's
+	# own routes/. Built before anybody joins, so every client is sent the whole mountain.
+	var delivered := 0
+
+	for root in await DotGameContent.map_dirs(server, "routes"):
+		delivered += world.load_directory(root)
+
+	if delivered > 0:
+		world.build_routes()
+
 	add_command("dd_status", _cmd_status, "Show the routes and who is driving where")
 	add_command("dd_bank", _cmd_bank, "Show the accounts this server has loaded")
 	add_command("dd_weather", _cmd_weather, "Force the sky everywhere: clear, rain, snow, wind, or off", DotAdminFlags.CHANGEMAP)
