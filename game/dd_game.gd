@@ -722,7 +722,8 @@ func _put_at(driver: Driver, stage: int) -> void:
 	var trip: DdTrip = driver.trip
 	var road: DdRoute = routes[trip.route_id]
 	var d := road.checkpoint_distance(stage)
-	var at := road.transform_at(d, 0.6)
+	# A couple of centimetres over its ride height, so it settles rather than drops.
+	var at := road.transform_at(d, (driver.truck as DdTruck).ride_height() + 0.02)
 	at.origin += road.position
 	(driver.truck as DdTruck).place(at)
 

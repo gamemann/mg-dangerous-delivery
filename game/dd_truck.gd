@@ -202,6 +202,21 @@ func place(where: Transform3D) -> void:
 	PhysicsServer3D.body_set_state(get_rid(), PhysicsServer3D.BODY_STATE_ANGULAR_VELOCITY, Vector3.ZERO)
 
 
+## How far above the road this truck's origin is when it stands on its wheels at rest:
+## the lowest wheel's tyre bottom, measured from the origin. Placing a truck at this
+## height puts it down on the road; the flat 0.6 m it used to be put at dropped every
+## truck, it landed at 0.4 s, bounced clear of the road and rocked on two wheels for
+## three seconds of every trip start and every put-back.
+func ride_height() -> float:
+	var lowest := 0.0
+
+	for wheel in _wheels:
+		var bottom := wheel.position.y - wheel.wheel_rest_length - wheel.wheel_radius
+		lowest = minf(lowest, bottom)
+
+	return -lowest
+
+
 func wheel_count() -> int:
 	return _wheels.size()
 

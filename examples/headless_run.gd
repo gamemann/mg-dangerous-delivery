@@ -19,7 +19,7 @@ const DdProgress := preload("res://game/dd_progress.gd")
 const DdTerrain := preload("res://game/dd_terrain.gd")
 
 const SECTIONS := 17
-const CHECKS := 94
+const CHECKS := 95
 
 var _passed := 0
 var _failed := 0
@@ -352,7 +352,15 @@ func _test_a_delivery() -> void:
 	var me: DdGame.Driver = game.drivers[&"p1"]
 	_check(started.ok and me.on_road(), "a trip sets off")
 	_check((me.trip as DdTrip).state == DdTrip.State.HOLD, "held at the start first")
-	await _seconds(1.2)
+	var wheels: Array[int] = []
+	for t in range(72):
+		await get_tree().physics_frame
+		wheels.append((me.truck as DdTruck).wheels_on_ground())
+	# Set down at its ride height, not dropped: on all four wheels within a few ticks and
+	# never off them after. Dropped from 0.6 m it bounced clear at 0.7 s and rocked on two
+	# wheels for three seconds (and this check's old wall-clock wait hid it on a fast box).
+	_check(wheels.slice(10).count(4) == wheels.size() - 10,
+		"a truck is set down on the road, not dropped onto it", str(wheels))
 	_check((me.trip as DdTrip).state == DdTrip.State.DRIVING and (me.truck as DdTruck).wheels_on_ground() == 4,
 		"then driving, on all four wheels", "%s %d" % [(me.trip as DdTrip).state_name(), (me.truck as DdTruck).wheels_on_ground()])
 
@@ -565,9 +573,12 @@ func _test_a_trailer() -> void:
 
 # --- Harness -----------------------------------------------------------------
 
+## [param s] seconds of SIMULATION, counted in physics ticks rather than on the clock.
+## On the clock, a slow CI runner simulated fewer ticks in the same wall time and the
+## truck had not settled onto its four wheels by the check after "1.2 s" (2 of 4 on
+## GitHub, 4 of 4 here).
 func _seconds(s: float) -> void:
-	var until := Time.get_ticks_msec() + int(s * 1000.0)
-	while Time.get_ticks_msec() < until:
+	for _i in range(ceili(s * Engine.physics_ticks_per_second)):
 		await get_tree().physics_frame
 
 
