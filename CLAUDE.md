@@ -27,6 +27,7 @@ game/
   dd_game.gd       the world: every route side by side, drivers, trips, falls, rock, solo, stand-ins, garage_view()
   dd_hud.gd        the stage strip, the numbers, the keys, a message line
   dd_garage.gd     the lot: routes, trucks, upgrades; asks through a callable and is told
+  dd_settings.gd   the player's field of view and volume, and their screen (the lot's SETTINGS button, O)
   dd_client.gd     one player: offline it owns the world, connected it mirrors one; camera, controls, particles, visibility
   dd_module.gd     the DotGameModule: netcode numbers, cvars (dd_bots, dd_solo, dd_skip, dd_rocks, dd_collide), dd_status/dd_bank/dd_weather/dd_give, stand-ins, the bank's store
   dd_services.gd   chat (all, admin, whisper), push-to-talk voice, moderation, over dot-game's base
@@ -39,7 +40,7 @@ game/
 routes/            five routes, written by tools/build_routes.py
 assets/kenney/trucks/  four Car Kit trucks and their atlas, CC0
 scenes/            dd_server.tscn
-examples/          headless_run (16 sections, 89 checks), headless_net (10, 33), dedicated (6, 19)
+examples/          headless_run (17 sections, 91 checks), headless_net (10, 33), dedicated (6, 19)
 tools/             build_routes.py; drive.sh/.gd (a stand-in delivers every route); shot.sh/.gd (render)
 ```
 
@@ -100,13 +101,17 @@ What rendering found, in order (`tools/shot.sh`, none of it visible to a suite):
 - **The 38 m drop strip ended in a lip** 2.5 m over the terrain, shaded unlike it; it is 13 m now, with the terrain 1 m under its plane. (A dark arch beside Devil's Spine's depot, seen from above, outlived that change: it is the massif's edge steepening into the lake, 50 m from the road, and was left.)
 - **Casting shadows, the mountain cost a fifth of a software-rendered frame** (a 10 s drive render: 56 s against 46 s without it); off, 47 s.
 
+## Settings, behind a button (2026-10-08)
+
+`DdSettings` is mg-buses-from-hell's `BfhSettings` cut down to what this game reads: the field of view (SERVER_CLAMPED, default the 70 the camera always had) and one master volume on the engine's Master bus, which every `DdSounds` player goes through. **No sensitivity**: a player is their truck, the mouse turns nothing, and a slider nobody reads is the thing that file says a setting must never be. **Behind the lot's SETTINGS button and O, not Escape**, because Escape is how a driver gets back to the lot. The lot hides while the screen is up: dot-ui's panel is translucent, and the first render printed the route list through Apply. dot-settings is newly linked (the shell vendors it). `headless_run`'s "the client's settings are read" boots a real client and presses the button (17 sections, 91 checks; it failed as written until the look code, which named a class this game does not link, was cut).
+
 ## Validating
 
 ```bash
 godot --headless --path . --import
 find . -name '*.gd' -not -path './.godot/*' -not -path './addons/*' | while read f; do
     godot --headless --path . --check-only --script "res://${f#./}"; done
-godot --headless --path . res://examples/headless_run.tscn   # 16 sections, 89 checks, ~35 s
+godot --headless --path . res://examples/headless_run.tscn   # 17 sections, 91 checks, ~35 s
 godot --headless --path . res://examples/headless_net.tscn   # 10 sections, 33 checks: server and client over loopback
 godot --headless --path . res://examples/dedicated.tscn      # 6 sections, 19 checks: a real DotServer and the module by path
 tools/build_routes.py --check

@@ -18,8 +18,8 @@ const DdTrip := preload("res://game/dd_trip.gd")
 const DdProgress := preload("res://game/dd_progress.gd")
 const DdTerrain := preload("res://game/dd_terrain.gd")
 
-const SECTIONS := 16
-const CHECKS := 89
+const SECTIONS := 17
+const CHECKS := 91
 
 var _passed := 0
 var _failed := 0
@@ -61,6 +61,7 @@ func _ready() -> void:
 	_test_pay()
 	_test_ice_and_debris()
 	await _test_a_trailer()
+	await _test_the_client_settings()
 
 	print("")
 	print("%d sections entered, %d finished" % [_entered, _finished])
@@ -568,6 +569,36 @@ func _seconds(s: float) -> void:
 	var until := Time.get_ticks_msec() + int(s * 1000.0)
 	while Time.get_ticks_msec() < until:
 		await get_tree().physics_frame
+
+
+## A real offline client, booted: its settings are read by its camera, and the lot's
+## SETTINGS button opens them (Escape is the lot's own key here).
+func _test_the_client_settings() -> void:
+	_section("the client's settings are read, and the lot opens them")
+	var client: Node = (load("res://game/dd_client.gd") as GDScript).new()
+	add_child(client)
+
+	for i in 6:
+		await get_tree().process_frame
+
+	var settings: Variant = client.get("settings")
+	var camera: Camera3D = client.get("camera")
+	_check(
+		settings != null and camera != null and bool(settings.describe().get("camera_bound", false)) \
+			and is_equal_approx(camera.fov, float(settings.settings.get_int(&"field_of_view", 0))),
+		"the client's settings are read by its camera",
+		str(settings.describe()) if settings != null else "no settings"
+	)
+	var garage: Node = client.get("garage")
+	var button := garage.find_child("Settings", true, false) as Button if garage != null else null
+	if button != null:
+		button.pressed.emit()
+	_check(button != null and settings != null and settings.is_open(), "and the lot's SETTINGS button opens them")
+
+	remove_child(client)
+	client.free()
+	await get_tree().process_frame
+	_finished_section()
 
 
 func _section(name: String) -> void:

@@ -1,5 +1,8 @@
 extends Control
 
+## The player asked for the settings screen. The client owns it; the lot only has the button.
+signal settings_requested
+
 ## The lot: pick a route, pick a truck, buy one, upgrade it, set off.
 ##
 ## [b]It asks and is told.[/b] Every button calls [member act] with an action and its
@@ -76,6 +79,15 @@ func _ready() -> void:
 	_notice.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_notice.add_theme_color_override("font_color", Color(1.0, 0.8, 0.4))
 	foot.add_child(_notice)
+	# [b]Settings live behind a button here, not behind Escape[/b], which this game gave to the
+	# lot itself: Escape is how a driver gets back to the garage, and taking it would leave
+	# them no key for the one screen every trip starts from.
+	var options := Button.new()
+	options.name = "Settings"
+	options.text = "  SETTINGS  "
+	options.add_theme_font_size_override("font_size", 18)
+	options.pressed.connect(func() -> void: settings_requested.emit())
+	foot.add_child(options)
 	var go := Button.new()
 	go.name = "Start"
 	go.text = "  SET OFF  "

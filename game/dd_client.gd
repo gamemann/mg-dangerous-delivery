@@ -19,6 +19,7 @@ const DdNetBridge := preload("net/dd_net_bridge.gd")
 const DdTruckNet := preload("net/dd_truck_net.gd")
 const DdClientChat := preload("dd_client_chat.gd")
 const DdSounds := preload("dd_sounds.gd")
+const DdSettings := preload("dd_settings.gd")
 
 ## Where dot-server's client publishes its link before the game scene loads. Present: this
 ## client is connected; absent: it is offline and owns its world.
@@ -57,6 +58,9 @@ var _look := Vector3.ZERO
 
 var chat: DdClientChat = null
 var sounds: DdSounds = null
+
+## The player's own settings: the field of view and the volume. See [DdSettings].
+var settings: DdSettings = null
 var net: DotNetManager = null
 var bridge: DdNetBridge = null
 var link: Node = null
@@ -109,6 +113,8 @@ func _ready() -> void:
 	sounds = DdSounds.new()
 	sounds.name = "Sounds"
 	add_child(sounds)
+
+	_build_settings()
 
 	if not _offline:
 		_show_garage(true)
@@ -297,6 +303,40 @@ func _frame_garage_camera() -> void:
 	camera.look_at(at.origin + at.basis * Vector3(0.0, 1.0, -30.0))
 
 
+## The player's settings, bound to the camera; the lot's SETTINGS button and O open them.
+func _build_settings() -> void:
+	settings = DdSettings.new()
+	settings.name = "Settings"
+	add_child(settings)
+
+	var built: DotResult = settings.setup()
+
+	if not built.ok:
+		DotLog.warn(CHANNEL, "no settings; everything is at its default", {"why": built.error.message})
+		remove_child(settings)
+		settings.free()
+		settings = null
+		return
+
+	settings.bind_camera(camera)
+
+	if garage != null:
+		garage.settings_requested.connect(settings.open)
+
+	if settings.stack != null and garage != null:
+		# [b]The lot steps aside while the settings are up.[/b] dot-ui's panel is translucent,
+		# which reads well over a road and not at all over the lot's three columns of text:
+		# the first render had the route list printed through the Apply button.
+		var lot_was_up := [false]
+		settings.stack.menu_state_changed.connect(func(any_open: bool) -> void:
+			if any_open:
+				lot_was_up[0] = garage.visible
+				garage.visible = false
+			elif lot_was_up[0]:
+				garage.visible = true
+		)
+
+
 # --- Controls ----------------------------------------------------------------
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -319,6 +359,10 @@ func _unhandled_input(event: InputEvent) -> void:
 			_act("skip")
 		KEY_C:
 			camera_mode = (camera_mode + 1) % 3 as CameraMode
+		KEY_O:
+			# The settings from the road, where the lot's button is not on screen.
+			if settings != null:
+				settings.open()
 		KEY_G, KEY_ESCAPE:
 			_act("garage")
 
